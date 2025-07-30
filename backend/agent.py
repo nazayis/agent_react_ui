@@ -10,6 +10,7 @@ from textwrap import dedent
 # Web scraping imports
 import requests
 from bs4 import BeautifulSoup
+import re
 
 # --- Agno & OpenAI Libraries ---
 try:
@@ -43,11 +44,38 @@ def read_articles(urls: list[str]) -> str:
         try:
             response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
             response.raise_for_status()
-            soup = BeautifulSoup(response.content, 'html.parser')
-            text = soup.get_text(separator='\n', strip=True)
-            combined_text += f"\n\n--- CONTENT FROM {url} ---\n\n{text}"
+            
+            # Encoding'i düzgün handle et
+            if response.encoding is None:
+                response.encoding = 'utf-8'
+            
+            # BeautifulSoup'a düzgün encoded text ver
+            try:
+                # Önce response.text kullanmayı dene (otomatik encoding)
+                soup = BeautifulSoup(response.text, 'html.parser')
+            except UnicodeDecodeError:
+                # Eğer hata olursa utf-8 ile zorla
+                soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), 'html.parser')
+            
+            # Sadece ana içerik alanlarını al
+            # Scripttleri, style'ları ve navigation'ları kaldır
+            for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
+                element.decompose()
+            
+            text = soup.get_text(separator=' ', strip=True)
+            
+            # Fazla boşlukları temizle
+            text = re.sub(r'\s+', ' ', text)
+            text = re.sub(r'\n\s*\n', '\n\n', text)
+            
+            # Sadece yazdırılabilir karakterleri tut
+            text = ''.join(char for char in text if char.isprintable() or char in '\n\t')
+            
+            combined_text += f"\n\n--- CONTENT FROM {url} ---\n\n{text[:5000]}"  # İlk 5000 karakter
+            
         except Exception as e:
             combined_text += f"\n\n--- ERROR READING {url}: {str(e)} ---\n\n"
+    
     return combined_text
 
 # ==============================================================================
@@ -72,7 +100,7 @@ def generate_queries_endpoint():
             instructions=[
                 "You have a two-step job.",
                 "STEP 1: Take a topic from the user, generate 5 relevant Google search queries, and then immediately call the `get_user_input` tool to get user approval for these queries. Put each generated query into the `field_description` of a separate field.",
-                "STEP 2: After the user approves the queries, you will receive them as the result of the tool call. Then, for each approved query, execute a `google_search` and collect all the resulting URLs.",
+                "STEP 2: After the user approves the queries, you will receive them as the result of the tool call. Then, for each approved query, execute a `google_search` and collect the most relevant 3 of the resulting URLs.",
                 "Finally, output a single, flat list of all the URLs you found. Your final output must only be the list of URLs."
             ],
             session_id=session_id,
@@ -163,11 +191,14 @@ def analyze_and_propose_endpoint():
                 instructions=[
                     "You are a Senior Business Analyst.",
                     "1. You will be given a block of text containing URLs. Your first step is to extract these URLs.",
-                    "2. Call `read_articles` with the extracted list of URLs to get their content.",
-                    "3. Analyze the combined content to identify key market insights, competitors, and opportunities.",
+                    "2. For each URL, call `read_articles` with a single URL in a list (e.g., read_articles(['url1']), then read_articles(['url2']), etc.). This prevents token limit issues.",
+                    "3. Analyze the combined content from all URLs to identify key market insights, competitors, and opportunities.",
                     "4. Write a comprehensive, investor-ready business proposal in Turkish based on your analysis.",
                     "5. Call `write_file` to save the proposal to 'output/business_proposal.md'.",
-                    "6. Finally, return the full text of the proposal you wrote.",
+                    "6. Return ONLY the proposal text ONLY ONCE without any additional commentary or analysis.",
+                    "IMPORTANT: Do not repeat the proposal text. Return it only once at the end.",
+                    "CRITICAL: Call read_articles separately for each URL to avoid token limits. Do NOT pass all URLs at once.",
+
                 ],
                 session_id=session_id,
                 debug_mode=True
