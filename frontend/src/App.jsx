@@ -25,8 +25,8 @@ const ProgressIndicator = ({ stage, progress, message }) => {
   );
 };
 
-// Gömülü Onay Kutusu Bileşeni aynı kalıyor
-const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel }) => {
+// Gömülü Query Editor - Hem editable hem readonly modda çalışıyor
+const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel, isReadonly = false }) => {
   const [editedText, setEditedText] = useState(
     () => queries.map(q => q.query).join('\n')
   );
@@ -42,21 +42,29 @@ const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel }) => {
   };
 
   return (
-    <div className="embedded-editor-container">
+    <div className={`embedded-editor-container ${isReadonly ? 'readonly' : ''}`}>
       <div className="editor-header">
-        <h3>Arama Sorgularını Onaylayın</h3>
-        <p>Ajan aşağıdaki sorguları kullanmayı öneriyor. Üzerinde değişiklik yapabilir, silebilir veya yeni sorgular ekleyebilirsiniz. (Her sorgu ayrı bir satırda olmalıdır.)</p>
+        <h3>{isReadonly ? 'Onaylanan Arama Sorguları' : 'Arama Sorgularını Onaylayın'}</h3>
+        {!isReadonly && (
+          <p>Ajan aşağıdaki sorguları kullanmayı öneriyor. Üzerinde değişiklik yapabilir, silebilir veya yeni sorgular ekleyebilirsiniz. (Her sorgu ayrı bir satırda olmalıdır.)</p>
+        )}
+        {isReadonly && (
+          <p>Bu sorgular ile araştırma yapılıyor:</p>
+        )}
       </div>
       <textarea
-        className="query-textarea"
+        className={`query-textarea ${isReadonly ? 'readonly' : ''}`}
         value={editedText}
-        onChange={(e) => setEditedText(e.target.value)}
+        onChange={isReadonly ? undefined : (e) => setEditedText(e.target.value)}
+        disabled={isReadonly}
         rows={10}
       />
-      <div className="editor-footer">
-        <button onClick={onCancel} className="btn-cancel">İptal</button>
-        <button onClick={handleConfirm} className="btn-confirm">Onayla ve Devam Et</button>
-      </div>
+      {!isReadonly && (
+        <div className="editor-footer">
+          <button onClick={onCancel} className="btn-cancel">İptal</button>
+          <button onClick={handleConfirm} className="btn-confirm">Onayla ve Devam Et</button>
+        </div>
+      )}
     </div>
   );
 };
@@ -68,8 +76,9 @@ function App() {
   const messagesEndRef = useRef(null);
 
   // State yönetimi
-  const [showQueryEditor, setShowQueryEditor] = useState(false);
+  const [queryEditorState, setQueryEditorState] = useState('hidden'); // 'hidden', 'editing', 'approved'
   const [pendingQueries, setPendingQueries] = useState([]);
+  const [approvedQueries, setApprovedQueries] = useState([]);
   const [currentRunId, setCurrentRunId] = useState(null);
   
   const [currentStage, setCurrentStage] = useState({ stage: 'init', progress: 0, message: 'Hazırlanıyor...' });
@@ -77,7 +86,7 @@ function App() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, showQueryEditor]);
+  }, [messages, queryEditorState]);
 
   const handleApiError = (error, context) => {
     console.error(`API Hatası (${context}):`, error);
@@ -99,7 +108,8 @@ function App() {
     const currentInput = input;
     setInput('');
     setIsLoading(true);
-    setShowQueryEditor(false);
+    setQueryEditorState('hidden');
+    setApprovedQueries([]);
     setCurrentStage({ stage: 'generate', progress: 25, message: 'Arama sorguları üretiliyor...' });
 
     try {
@@ -114,7 +124,7 @@ function App() {
         if (data.is_paused && data.queries && data.queries.length > 0) {
           setPendingQueries(data.queries);
           setCurrentRunId(data.run_id);
-          setShowQueryEditor(true);
+          setQueryEditorState('editing');
           setCurrentStage({ stage: 'approval', progress: 40, message: 'Sorgular onayınızı bekliyor...' });
           setIsLoading(false);
         } else {
@@ -129,8 +139,9 @@ function App() {
   };
 
   // YENİ: 2. Aşama - Arama yapma
-  const handleQueryConfirmation = async (approvedQueries) => {
-    setShowQueryEditor(false);
+  const handleQueryConfirmation = async (confirmedQueries) => {
+    setApprovedQueries(confirmedQueries);
+    setQueryEditorState('approved');
     setIsLoading(true);
     setCurrentStage({ stage: 'research', progress: 60, message: 'Onaylanan sorgularla araştırma yapılıyor...' });
 
@@ -140,7 +151,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           run_id: currentRunId,
-          approved_queries: approvedQueries
+          approved_queries: confirmedQueries
         }),
       });
       const data = await response.json();
@@ -185,10 +196,11 @@ function App() {
   };
   
   const handleQueryCancel = () => {
-    setShowQueryEditor(false);
+    setQueryEditorState('hidden');
     setIsLoading(false);
     setCurrentRunId(null);
     setPendingQueries([]);
+    setApprovedQueries([]);
     setMessages(prev => [...prev, { text: 'İşlem kullanıcı tarafından iptal edildi.', sender: 'agent', isComplete: true }]);
     setCurrentStage({ stage: 'init', progress: 0, message: 'İptal edildi.' });
   };
@@ -217,12 +229,22 @@ function App() {
             </div>
           ))}
 
-          {/* Editör mesaj akışının içinde render ediliyor */}
-          {showQueryEditor && (
+          {/* Query Editor - editing veya approved modda gösteriliyor */}
+          {queryEditorState === 'editing' && (
             <EmbeddedQueryEditor
               queries={pendingQueries}
               onConfirm={handleQueryConfirmation}
               onCancel={handleQueryCancel}
+              isReadonly={false}
+            />
+          )}
+          
+          {queryEditorState === 'approved' && (
+            <EmbeddedQueryEditor
+              queries={approvedQueries}
+              onConfirm={() => {}}
+              onCancel={() => {}}
+              isReadonly={true}
             />
           )}
 
@@ -243,11 +265,11 @@ function App() {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="kullanıcı input chat box"
-            disabled={isLoading || showQueryEditor}
+            disabled={isLoading || queryEditorState === 'editing'}
           />
           <button 
             onClick={sendMessage} 
-            disabled={isLoading || showQueryEditor}
+            disabled={isLoading || queryEditorState === 'editing'}
           >
             Gönder
           </button>

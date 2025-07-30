@@ -372,3 +372,30 @@ body {
   margin-top: 10px;
   font-style: italic;
 }
+
+/* Query Editor Readonly Styles */
+.embedded-editor-container.readonly {
+  opacity: 0.7;
+  background-color: #151515;
+  border: 1px solid #3a3a3c;
+}
+
+.embedded-editor-container.readonly .editor-header h3 {
+  color: #8e8e93;
+}
+
+.embedded-editor-container.readonly .editor-header p {
+  color: #666;
+}
+
+.query-textarea.readonly {
+  background-color: #0f0f0f;
+  color: #8e8e93;
+  border-color: #3a3a3c;
+  cursor: not-allowed;
+}
+
+.query-textarea.readonly:focus {
+  border-color: #3a3a3c;
+  box-shadow: none;
+}
