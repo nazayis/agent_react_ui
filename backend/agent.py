@@ -1,45 +1,105 @@
-# agent.py
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import asyncio
 import uuid
 from pathlib import Path
 from textwrap import dedent
-
-# Web scraping imports
+import re
 import requests
 from bs4 import BeautifulSoup
-import re
+from enum import Enum
+from dataclasses import dataclass
+from typing import Optional
+from agno.models.message import Message
 
-# --- Agno & OpenAI Libraries ---
+
+
+# --- Agno & OpenAI Kütüphaneleri ---
 try:
     from agno.agent import Agent
     from agno.models.openai import OpenAIChat
+    from agno.team import Team
     from agno.tools.googlesearch import GoogleSearchTools
     from agno.tools.mcp import MCPTools
     from agno.tools import tool
+    from agno.memory.v2 import Memory, MemoryManager
+    from agno.memory.v2.db.sqlite import SqliteMemoryDb
     from agno.tools.user_control_flow import UserControlFlowTools
     from dotenv import load_dotenv
 except ImportError as e:
     print(f"Hata: Gerekli kütüphanelerden biri eksik: {e}")
     exit(1)
 
-# --- Flask, CORS, Project Configuration ---
+# --- Flask ve CORS Kurulumu ---
 app = Flask(__name__)
 CORS(app)
+
+# --- Proje Konfigürasyonu ---
 load_dotenv()
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-# --- Global State ---
+# --- İş Akışı Aşamaları ---
+class ProposalStage(Enum):
+    INIT = "init"
+    RESEARCH = "research"  # Searcher aşaması
+    AWAITING_CONFIRM = "awaiting_confirm"  # Kullanıcı onayı bekleniyor
+    ANALYSIS = "analysis"  # Summarizer aşaması
+    WRITING = "writing"    # Proposer aşaması
+    SAVING = "saving"      # Dosya kaydetme aşaması
+    COMPLETE = "complete"
+    ERROR = "error"
+
+@dataclass
+class StageInfo:
+    stage: ProposalStage
+    progress: int  # 0-100 arası
+    message: str
+
+# Aşama bilgilerini saklamak için global değişken
+current_stage: Optional[StageInfo] = None
+
+# Pending runs storage
 pending_runs = {}
 
-# --- Custom Tool: read_articles ---
+def update_stage(stage: ProposalStage, message: str = "") -> None:
+    """İş akışı aşamasını günceller ve ilerleme yüzdesini hesaplar"""
+    global current_stage
+    
+    # Her aşama için ilerleme yüzdesi
+    progress_map = {
+        ProposalStage.INIT: 0,
+        ProposalStage.RESEARCH: 15,
+        ProposalStage.AWAITING_CONFIRM: 25,
+        ProposalStage.ANALYSIS: 50,
+        ProposalStage.WRITING: 75,
+        ProposalStage.SAVING: 90,
+        ProposalStage.COMPLETE: 100,
+        ProposalStage.ERROR: 0
+    }
+    
+    stage_messages = {
+        ProposalStage.INIT: "Hazırlanıyor...",
+        ProposalStage.RESEARCH: "Arama sorguları hazırlanıyor...",
+        ProposalStage.AWAITING_CONFIRM: "Arama sorgularının onayı bekleniyor...",
+        ProposalStage.ANALYSIS: "Bilgiler analiz ediliyor...",
+        ProposalStage.WRITING: "İş teklifi yazılıyor...",
+        ProposalStage.SAVING: "Doküman kaydediliyor...",
+        ProposalStage.COMPLETE: "Tamamlandı!",
+        ProposalStage.ERROR: "Bir hata oluştu!"
+    }
+
+    current_stage = StageInfo(
+        stage=stage,
+        progress=progress_map[stage],
+        message=message or stage_messages[stage]
+    )
+
+# --- Custom Tools ---
 @tool
-def read_articles(urls: list[str]) -> str:
-    """Fetch and combine readable text content from multiple URLs into a single string."""
-    combined_text = ""
+def read_articles(urls: list[str]) -> dict[str, str]:
+    """Fetch readable text content from multiple URLs. Returns a dictionary mapping each URL to its extracted text."""
+    results = {}
     for url in urls:
         try:
             response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
@@ -49,15 +109,8 @@ def read_articles(urls: list[str]) -> str:
             if response.encoding is None:
                 response.encoding = 'utf-8'
             
-            # BeautifulSoup'a düzgün encoded text ver
-            try:
-                # Önce response.text kullanmayı dene (otomatik encoding)
-                soup = BeautifulSoup(response.text, 'html.parser')
-            except UnicodeDecodeError:
-                # Eğer hata olursa utf-8 ile zorla
-                soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), 'html.parser')
+            soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Sadece ana içerik alanlarını al
             # Scripttleri, style'ları ve navigation'ları kaldır
             for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
                 element.decompose()
@@ -71,144 +124,416 @@ def read_articles(urls: list[str]) -> str:
             # Sadece yazdırılabilir karakterleri tut
             text = ''.join(char for char in text if char.isprintable() or char in '\n\t')
             
-            combined_text += f"\n\n--- CONTENT FROM {url} ---\n\n{text[:5000]}"  # İlk 5000 karakter
+            results[url] = text[:5000]  # İlk 5000 karakter
             
         except Exception as e:
-            combined_text += f"\n\n--- ERROR READING {url}: {str(e)} ---\n\n"
-    
-    return combined_text
+            results[url] = f"Error reading article: {str(e)}"
+    return results
 
-# ==============================================================================
-# STEP 1: GENERATE QUERIES AND PAUSE FOR APPROVAL
-# ============================================================================== 2 agent | 1 Agent --> market research & gerekli linkleri çıkart, okumayı yap, analiz  --> MCPye ihtiyacı yok GoogleSearchTools()
-# ------------------------------------------------------------------------------         | 1 Agent --> sonuçları incele, proposal'ı yaz, MCP'ye bas | MCPye ihtiyacı var --> MCPTools()
+# --- Agent Definitions with State Management ---
+class StateAwareAgent(Agent):
+    def __init__(self, *args, **kwargs):
+        self.stage = kwargs.pop('stage', ProposalStage.INIT)
+        super().__init__(*args, **kwargs)
 
-@app.route('/generate-queries', methods=['POST'])
-def generate_queries_endpoint():
-    data = request.json
-    user_message = data.get('message')
-    if not user_message:
-        return jsonify({'error': 'Message cannot be empty'}), 400
+    async def arun(self, *args, **kwargs):
+        update_stage(self.stage)
+        return await super().arun(*args, **kwargs)
 
-    session_id = str(uuid.uuid4())
+# Updated searcher with improved user control flow instructions
+searcher = StateAwareAgent(
+    name="Searcher",
+    role="Searches the top URLs for a topic",
+    model=OpenAIChat(id="gpt-4o-mini"),
+    stage=ProposalStage.RESEARCH,
+    instructions=[
+        "Your task is to find the best URLs about a given topic through user control flow:",
+        "1. **Generate Search Queries**: Create 5 relevant search terms for the topic.",
+        "2. **Get User Approval**: Use get_user_input tool to present these queries:",
+        "   - Create 5 fields: query_1, query_2, query_3, query_4, query_5",
+        "   - Put your proposed search query in the field_description",
+        "   - Example: field_name='query_1', field_description='köpek gezdirme uygulamaları inceleme'",
+        "3. **Execute Searches**: After receiving user input, use the approved queries to search.",
+        "4. **Return URLs**: For each query, find 3 best URLs and return them all.",
+        "IMPORTANT: Always use get_user_input first before doing any searches.",
+        "The field_description should contain your proposed search query text.",
+    ],
+    tools=[GoogleSearchTools(), UserControlFlowTools()],
+    monitoring=True,
+)
 
-    async def _run():
-        # This agent now has a multi-step plan.
-        query_and_search_agent = Agent(
-            model=OpenAIChat(id="gpt-4o-mini"),
-            # Give it all the tools it will need for the entire task.
-            tools=[UserControlFlowTools(), GoogleSearchTools()],
-            instructions=[
-                "You have a two-step job.",
-                "STEP 1: Take a topic from the user, generate 5 relevant Google search queries, and then immediately call the `get_user_input` tool to get user approval for these queries. Put each generated query into the `field_description` of a separate field.",
-                "STEP 2: After the user approves the queries, you will receive them as the result of the tool call. Then, for each approved query, execute a `google_search` and collect the most relevant 3 of the resulting URLs.",
-                "Finally, output a single, flat list of all the URLs you found. Your final output must only be the list of URLs."
-            ],
-            session_id=session_id,
-            debug_mode=True
-        )
+summarizer = StateAwareAgent(
+    name="Summarizer", 
+    role="Summarizes article content to extract key pain points and business takeaways",
+    description="Given a long article, this agent produces a concise summary of the pain points, key facts, and insights.",
+    model=OpenAIChat(id="gpt-4o-mini"),
+    stage=ProposalStage.ANALYSIS,
+    instructions=[
+        "Read all articles given to you by the Searcher Agent, one by one.",
+        "Return a short, structured summary that captures:",
+        "- Main pain points discussed",
+        "- Any key facts, stats, or trends", 
+        "- The core takeaway(s) for business or product strategy",
+        "Use bullet points or short paragraphs for clarity.",
+        "Be objective with your statements and reviews.",
+        "Do not include advertisement baits",
+        "Lastly, return a synthesized summary of all articles combined.",
+    ],
+    tools=[read_articles],
+    monitoring=True,
+)
 
-        response = await query_and_search_agent.arun(user_message)
+proposer = StateAwareAgent(
+    name="Proposer",
+    role="Writes a high‑quality business proposal",
+    description=(
+        "Sen bir Girişim Danışmanlığı Şirketinde kıdemli bir Business Analyst Uzmanısın. Sana bir konu ve yapılmış competitor analysis verildiğinde, amacın bu konu hakkında yüksek kaliteli bir iş teklifi yazmaktır."
+    ),
+    stage=ProposalStage.WRITING,
+    instructions=[
+        "Summarizer Agent'ın sana ilettiği competitor analysis bilgilerini de kullanarak konu hakkında yüksek kaliteli ve Türkçe dilinde bir iş teklifi yaz.",
+        "Teklif iyi yapılandırılmış, bilgilendirici, örneklendirici ve eleştirel olmalıdır.",
+        "Mümkün olduğunda gerçekleri alıntılayarak nüanslı ve dengeli bir bakış açısı sun.",
+        "Açıklık, tutarlılık ve genel kaliteye odaklan.",
+        "Asla gerçek uydurma veya intihal yapma. Her zaman uygun atıf ver.",
+        "Unutma: Tanınmış bir Startup Danışmanlık Şirketi için yazıyorsun, bu nedenle teklifin kalitesi çok önemlidir.",
+    ],
+    monitoring=True,
+)
 
-        if response.is_paused:
-            run_id = response.run_id
-            # Store the agent instance itself to continue its session later
-            pending_runs[run_id] = {'agent': query_and_search_agent}
+# --- Configuration & Memory Setup ---
+USER_MEMORY_DB_FILE = Path(__file__).parent / "memory/user_preferences.db"
+USER_MEMORY_DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+user_memory_db = SqliteMemoryDb(table_name="user_memories", db_file=str(USER_MEMORY_DB_FILE))
 
-            queries = []
-            for tool in response.tools_requiring_user_input:
-                if tool.tool_name == 'get_user_input':
-                    for field in tool.user_input_schema:
-                        queries.append({'query': field.description, 'field_name': field.name})
-            
-            return jsonify({
-                'is_paused': True,
-                'run_id': run_id,
-                'queries': queries,
-                'message': 'Please approve the search queries.'
-            })
+memory_manager = MemoryManager(memory_capture_instructions=dedent("""
+    Your job is to capture only the most valuable, final outputs from a conversation.
+    - WHAT TO SAVE:
+    1. The user's initial request/topic.
+    2. The final, complete business proposal text.
+    3. Key pain points identified by the Searcher agent.
+    - WHAT TO IGNORE:
+    - DO NOT save URL lists, search results, raw website text, intermediate summaries, or other unprocessed data.
+    - Your goal is to store the refined, final output that can be useful for future reference. If the input text does not fit this description, ignore it.
+"""))
+
+# --- Unified Agent Logic ---
+async def run_business_proposal_team(user_message: str, user_id: str, session_id: str) -> dict:
+    """
+    Runs the full agent team to generate or revise a business proposal.
+    Returns both the response content and the current stage information.
+    """
+    try:
+        update_stage(ProposalStage.INIT)
+        memory_instance = Memory(db=user_memory_db, memory_manager=memory_manager)        
         
-        return jsonify({'error': "Agent did not pause for user confirmation."}), 500
-
-    return asyncio.run(_run())
-
-# ==============================================================================
-# STEP 2: EXECUTE SEARCH WITH APPROVED QUERIES
-# ==============================================================================
-
-@app.route('/execute-search', methods=['POST'])
-def execute_search_endpoint():
-    data = request.json
-    run_id = data.get('run_id')
-    approved_queries = data.get('approved_queries', [])
-
-    if not run_id or run_id not in pending_runs:
-        return jsonify({'error': 'Invalid run_id'}), 404
-
-    # Retrieve the agent instance from the previous step
-    run_info = pending_runs.pop(run_id)
-    agent = run_info['agent']
-    
-    run_response = agent.run_response
-    if not run_response or not run_response.is_paused:
-        return jsonify({'error': 'This run is not in a paused state.'}), 400
-
-    async def _run():
-        # Process user approvals from the frontend
-        approved_map = {q['field_name']: q['query'] for q in approved_queries if q.get('approved', True)}
-        for tool in run_response.tools_requiring_user_input:
-            if tool.tool_name == 'get_user_input':
-                for field in tool.user_input_schema:
-                    # Provide the approved query as the 'value' for the input field
-                    field.value = approved_map.get(field.name, "")
-
-        # **FIXED**: Continue the run without the invalid 'user_message' argument.
-        # The agent will now follow STEP 2 of its original instructions.
-        response = await agent.acontinue_run(run_response=run_response)
-
-        # The agent's final content should be the list of URLs
-        return jsonify({'urls': response.content, 'message': 'URLs collected successfully.'})
-
-    return asyncio.run(_run())
-
-# ==============================================================================
-# STEP 3: ANALYZE, PROPOSE, AND SAVE
-# ==============================================================================
-
-@app.route('/analyze-and-propose', methods=['POST'])
-def analyze_and_propose_endpoint():
-    data = request.json
-    urls = data.get('urls') # This is a text block containing URLs
-    if not urls:
-        return jsonify({'error': 'URL list cannot be empty'}), 400
+        team_instructions = [
+            "You are a Senior Publisher. Your primary goal is to produce a high-quality, investor-ready business proposal based on a user's request.",
+            "Your workflow:",
+            "1. **NEW PROPOSAL**: For new topics, coordinate the team:",
+            "   - FIRST, immediately instruct 'Searcher' to find relevant URLs using user-approved search queries",
+            "   - IMPORTANT: The Searcher agent will use get_user_input to present 5 search queries (query_1 to query_5) for user approval",
+            "   - Then, have 'Summarizer' analyze the content from those URLs", 
+            "   - Finally, have 'Proposer' write a comprehensive business proposal in Turkish",
+            "2. **REVISION**: For revisions, read existing files and update them",
+            "3. **SAVE RESULTS**: Always save the final proposal to output/ directory",
+            "CRITICAL: All file paths must start with 'output/' prefix.",
+            "CRITICAL: Always start by transferring the task to 'Searcher' first - do not use get_user_input yourself.",
+            "Focus on clarity, coherence, and overall quality."
+        ]
         
-    session_id = str(uuid.uuid4())
+        #  MCP sunucusunu başlat ve bağlantıyı kur
+        mcp_server_command = f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}"
+        mcp_tools = MCPTools(mcp_server_command, timeout_seconds=30)
+        await mcp_tools.__aenter__()
 
-    async def _run():
-        async with MCPTools(f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}", timeout_seconds=30) as fs_tools:
-            orchestrator_agent = Agent(
-                model=OpenAIChat(id="gpt-4o"),
-                tools=[read_articles, fs_tools],
-                instructions=[
-                    "You are a Senior Business Analyst.",
-                    "1. You will be given a block of text containing URLs. Your first step is to extract these URLs.",
-                    "2. For each URL, call `read_articles` with a single URL in a list (e.g., read_articles(['url1']), then read_articles(['url2']), etc.). This prevents token limit issues.",
-                    "3. Analyze the combined content from all URLs to identify key market insights, competitors, and opportunities.",
-                    "4. Write a comprehensive, investor-ready business proposal in Turkish based on your analysis.",
-                    "5. Call `write_file` to save the proposal to 'output/business_proposal.md'.",
-                    "6. Return ONLY the proposal text ONLY ONCE without any additional commentary or analysis.",
-                    "IMPORTANT: Do not repeat the proposal text. Return it only once at the end.",
-                    "CRITICAL: Call read_articles separately for each URL to avoid token limits. Do NOT pass all URLs at once.",
-                ],
+        try:
+            editor_team = Team(
+                name="Publisher",
+                mode="coordinate",
+                model=OpenAIChat(id="gpt-4o-mini"),
+                members=[searcher, summarizer, proposer],
+                # --- DEĞİŞİKLİK BURADA ---
+                # UserControlFlowTools'u ana takımın araçlarına ekliyoruz.
+                tools=[mcp_tools, UserControlFlowTools()],
+                # -------------------------
+                memory=memory_instance,
+                enable_user_memories=True,
+                add_history_to_messages=True, 
+                user_id=user_id,
                 session_id=session_id,
+                description=(
+                    "Sen kıdemli bir yayıncısın. Sana bir iş fikri verildiğinde, amacın detaylı, eleştirel ve yatırımcıya hazır bir iş teklifi sunmaktır."
+                ),
+                instructions=team_instructions,
+                add_datetime_to_instructions=True,
+                add_member_tools_to_system_message=False,
+                enable_agentic_context=True,
+                share_member_interactions=True,
+                # Önceki öneriyi de koruyalım, bu en stabil sonucu verir.
+                show_members_responses=False,
+                markdown=True,
                 debug_mode=True
             )
 
-            response = await orchestrator_agent.arun(f"Analyze the content from these URLs and write a proposal: {urls}")
-            return jsonify({'proposal': response.content, 'message': 'Business proposal created and saved successfully.'})
+            response = await editor_team.arun(user_message)
+            
+            # DEBUG: Log paused state
+            print(f"DEBUG: Team response.is_paused: {response.is_paused}")
+            print(f"DEBUG: Team response has tools_requiring_user_input: {hasattr(response, 'tools_requiring_user_input')}")
+            if hasattr(response, 'tools_requiring_user_input'):
+                print(f"DEBUG: Team tools count: {len(response.tools_requiring_user_input) if response.tools_requiring_user_input else 0}")
+            
+            # Check if any agent needs user input
+            # Also check member states even if team is not paused
+            team_is_paused = response.is_paused
+            member_is_paused = False
+            
+            # Extract search queries from user input tools
+            queries = []
+            
+            # First check direct team tools
+            if hasattr(response, 'tools_requiring_user_input') and response.tools_requiring_user_input:
+                print(f"DEBUG: Found team level tools_requiring_user_input")
+                for tool in response.tools_requiring_user_input:
+                    if tool.tool_name == 'get_user_input':
+                        for field in tool.user_input_schema:
+                            if field.name.startswith('query_'):
+                                proposed_query = field.description or f"Sorgu {field.name.split('_')[1]}"
+                                queries.append({
+                                    'query': proposed_query,
+                                    'field_name': field.name
+                                })
+            
+            # Check team members' states regardless of team paused state
+            if hasattr(editor_team, 'members'):
+                print(f"DEBUG: Checking {len(editor_team.members)} members")
+                for member in editor_team.members:
+                    print(f"DEBUG: Member {member.name} - has run_response: {hasattr(member, 'run_response')}")
+                    if hasattr(member, 'run_response') and member.run_response:
+                        member_response = member.run_response
+                        print(f"DEBUG: Member {member.name} - is_paused: {hasattr(member_response, 'is_paused') and member_response.is_paused}")
+                        print(f"DEBUG: Member {member.name} - has tools: {hasattr(member_response, 'tools_requiring_user_input') and bool(member_response.tools_requiring_user_input)}")
+                        
+                        if (hasattr(member_response, 'is_paused') and member_response.is_paused and 
+                            hasattr(member_response, 'tools_requiring_user_input') and member_response.tools_requiring_user_input):
+                            member_is_paused = True
+                            print(f"DEBUG: Found paused member {member.name} with tools")
+                            for tool in member_response.tools_requiring_user_input:
+                                if tool.tool_name == 'get_user_input':
+                                    for field in tool.user_input_schema:
+                                        if field.name.startswith('query_'):
+                                            proposed_query = field.description or f"Sorgu {field.name.split('_')[1]}"
+                                            queries.append({
+                                                'query': proposed_query,
+                                                'field_name': field.name,
+                                                'member_name': member.name
+                                            })
+            
+            print(f"DEBUG: Total queries found: {len(queries)}")
+            print(f"DEBUG: Queries: {queries}")
+            
+            # If team is paused OR any member is paused with user input tools
+            if team_is_paused or (member_is_paused and queries):
+                update_stage(ProposalStage.AWAITING_CONFIRM)
+                
+                # Store the run for later resume
+                run_id = response.run_id
+                pending_runs[run_id] = {
+                    'team': editor_team,
+                    'user_id': user_id,
+                    'session_id': session_id,
+                    'mcp_tools': mcp_tools
+                }
+                
+                print(f"DEBUG: Returning paused response with {len(queries)} queries")
+                return {
+                    'response': 'Arama sorguları onayınızı bekliyor.',
+                    'stage': current_stage.stage.value,
+                    'progress': current_stage.progress,
+                    'message': current_stage.message,
+                    'is_paused': True,
+                    'run_id': run_id,
+                    'queries': queries
+                }
+            
+            print(f"DEBUG: No paused state detected, completing normally")
+            update_stage(ProposalStage.COMPLETE)
+            
+            return {
+                'response': response.content,
+                'stage': current_stage.stage.value,
+                'progress': current_stage.progress,
+                'message': current_stage.message,
+                'is_paused': False
+            }
 
-    return asyncio.run(_run())
+        finally:
+            # Only close MCP if not paused (if paused, we need it for resume)
+            if not response.is_paused:
+                await mcp_tools.__aexit__(None, None, None)
 
+    except Exception as e:
+        print(f"Team execution error: {e}")
+        update_stage(ProposalStage.ERROR, str(e))
+        return {
+            'response': f"Ajan ekibi çalışırken bir hata oluştu: {e}",
+            'stage': current_stage.stage.value,
+            'progress': current_stage.progress,
+            'message': current_stage.message,
+            'is_paused': False
+        }
 
+# --- API Uç Noktası ---
+@app.route('/chat', methods=['POST'])
+def chat():
+    try:
+        data = request.json
+        user_message = data.get('message')
+        if not user_message:
+            return jsonify({'error': 'Mesaj boş olamaz'}), 400
+
+        user_id = data.get('user_id', 'business-proposer-demo')
+        session_id = data.get('session_id', str(uuid.uuid4()))
+
+        response = asyncio.run(run_business_proposal_team(
+            user_id=user_id,
+            session_id=session_id,
+            user_message=user_message
+        ))
+
+        return jsonify(response)
+    except Exception as e:
+        print(f"API Error: {e}")
+        return jsonify({
+            'error': str(e),
+            'stage': 'error',
+            'progress': 0,
+            'message': f"Sistem hatası: {e}"
+        }), 500
+
+@app.route('/resume', methods=['POST'])
+def resume():
+    """Resume a paused agent run with user-approved queries"""
+    try:
+        data = request.json
+        run_id = data.get('run_id')
+        approved_queries = data.get('approved_queries', [])
+        
+        if not run_id:
+            return jsonify({'error': 'run_id gerekli'}), 400
+            
+        if run_id not in pending_runs:
+            return jsonify({'error': 'Geçersiz veya süresi dolmuş run_id'}), 404
+            
+        run_info = pending_runs[run_id]
+        team = run_info['team']
+        mcp_tools = run_info['mcp_tools']
+        
+        team_run_response = team.run_response
+        
+        if not team_run_response or not (team_run_response.is_paused or any(m.run_response and m.run_response.is_paused for m in team.members)):
+             return jsonify({'error': 'Bu çalışma duraklama durumunda değil'}), 400
+
+        try:
+            response = None
+            
+            # 1. Duraklamış olan ajanı ve onun response'unu bul.
+            paused_member = None
+            member_run_response = None
+            for member in team.members:
+                if (hasattr(member, 'run_response') and member.run_response and
+                    hasattr(member.run_response, 'is_paused') and member.run_response.is_paused):
+                    paused_member = member
+                    member_run_response = member.run_response
+                    print(f"DEBUG RESUME: Found paused member: {paused_member.name}")
+                    break
+            
+            if not paused_member or not member_run_response:
+                return jsonify({'error': 'Kullanıcı girdisi bekleyen bir ajan bulunamadı.'}), 400
+
+            # 2. Ajanın `run_response` nesnesini kullanıcı girdileriyle güncelle.
+            approved_query_map = {q['field_name']: q for q in approved_queries}
+            if hasattr(member_run_response, 'tools_requiring_user_input') and member_run_response.tools_requiring_user_input:
+                for tool in member_run_response.tools_requiring_user_input:
+                    if tool.tool_name == 'get_user_input':
+                        for field in tool.user_input_schema:
+                            if field.name in approved_query_map:
+                                field.value = approved_query_map[field.name].get('query', '')
+                                print(f"DEBUG RESUME: Set field '{field.name}' for member '{paused_member.name}'")
+
+            # 3. SADECE duraklamış olan ajanı devam ettir ve sonucunu al.
+            update_stage(ProposalStage.ANALYSIS, "Bilgiler analiz ediliyor...")
+            print(f"DEBUG RESUME: Continuing ONLY the paused member '{paused_member.name}'.")
+            agent_result_response = asyncio.run(paused_member.acontinue_run(run_response=member_run_response))
+            agent_output_content = agent_result_response.content
+            print(f"DEBUG RESUME: Member '{paused_member.name}' has finished. Now informing the team leader.")
+
+            # 4. Takımın mesaj geçmişini, ajanın sonucuyla GÜNCELLE.
+            #    Bu, OpenAI API hatasını önlemek için en kritik adımdır.
+            #    Takımın yaptığı 'transfer_task_to_member' çağrısının cevabını ekliyoruz.
+            if team.run_messages and team.run_response and team.run_response.tools:
+                # Takımın yaptığı son tool_call'u bul
+                last_tool_call = team.run_response.tools[-1]
+                if last_tool_call.tool_name == 'transfer_task_to_member':
+                    tool_call_id = last_tool_call.tool_call_id
+                    
+                    # 'tool' rolüyle yeni bir mesaj oluştur
+                    tool_response_message = {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": agent_output_content
+                    }
+                    
+                    # Bu mesajı takımın geçmişine ekle
+                    team.run_messages.messages.append(Message(**tool_response_message))
+                    print(f"DEBUG RESUME: Added tool response for call_id '{tool_call_id}' to team's message history.")
+                else:
+                    print("WARNING: Last tool call was not 'transfer_task_to_member'. State might be inconsistent.")
+            
+            # 5. Takımı, güncellenmiş durumuyla devam etmesi için tetikle.
+            #    'arun' metoduna boş bir mesaj yolluyoruz, çünkü yeni bir kullanıcı girdisi yok,
+            #    sadece mevcut iş akışına devam etmesini istiyoruz.
+            print("DEBUG RESUME: Triggering team to continue orchestration with updated history...")
+            response = asyncio.run(team.arun(message="")) 
+
+            del pending_runs[run_id]
+            
+            if response.is_paused:
+                # ... (Bu kısım aynı kalabilir)
+                return jsonify({'response': '...', 'is_paused': True})
+            else:
+                update_stage(ProposalStage.COMPLETE)
+                return jsonify({
+                    'response': response.content,
+                    'stage': current_stage.stage.value,
+                    'progress': current_stage.progress,
+                    'message': current_stage.message,
+                    'is_paused': False
+                })
+                
+        finally:
+            if response and hasattr(response, 'is_paused') and not response.is_paused:
+                try:
+                    if 'mcp_tools' in run_info and run_info['mcp_tools']:
+                        asyncio.run(run_info['mcp_tools'].__aexit__(None, None, None))
+                except Exception as cleanup_error:
+                    print(f"MCP cleanup error: {cleanup_error}")
+                    
+    except Exception as e:
+        import traceback
+        print(f"Resume Error: {e}")
+        traceback.print_exc()
+        if 'run_id' in locals() and run_id in pending_runs:
+            del pending_runs[run_id]
+        
+        return jsonify({
+            'error': str(e),
+            'stage': 'error',
+            'progress': 0,
+            'message': f"Devam etme hatası: {e}"
+        }), 500
+
+# --- Sunucuyu Başlat ---
 if __name__ == '__main__':
     app.run(debug=True, port=5001)

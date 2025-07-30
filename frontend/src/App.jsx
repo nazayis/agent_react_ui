@@ -1,4 +1,4 @@
-// App.jsx - Yeni 3-Aşamalı Endpoint Versiyonu
+// App.jsx - User Control Flows ile Entegre Versiyon
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -14,10 +14,10 @@ const ProgressIndicator = ({ stage, progress, message }) => {
       </div>
       <div className="progress-stages">
         <div className={`stage ${progress >= 0 ? 'active' : ''}`}>Başlangıç</div>
-        <div className={`stage ${progress >= 25 ? 'active' : ''}`}>Sorgu Üretimi</div>
-        <div className={`stage ${progress >= 40 ? 'active' : ''}`}>Onay</div>
-        <div className={`stage ${progress >= 60 ? 'active' : ''}`}>Araştırma</div>
-        <div className={`stage ${progress >= 80 ? 'active' : ''}`}>Analiz & Yazım</div>
+        <div className={`stage ${progress >= 15 ? 'active' : ''}`}>Araştırma</div>
+        <div className={`stage ${progress >= 25 ? 'active' : ''}`}>Onay</div>
+        <div className={`stage ${progress >= 50 ? 'active' : ''}`}>Analiz</div>
+        <div className={`stage ${progress >= 75 ? 'active' : ''}`}>Yazım</div>
         <div className={`stage ${progress >= 100 ? 'active' : ''}`}>Tamamlandı</div>
       </div>
       <div className="progress-message">{message}</div>
@@ -25,19 +25,20 @@ const ProgressIndicator = ({ stage, progress, message }) => {
   );
 };
 
-// Gömülü Query Editor - Hem editable hem readonly modda çalışıyor
-const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel, isReadonly = false }) => {
-  const [editedText, setEditedText] = useState(
-    () => queries.map(q => q.query).join('\n')
+// Query Editor - User Control Flows için
+const QueryEditor = ({ queries, onConfirm, onCancel, isReadonly = false }) => {
+  const [editedQueries, setEditedQueries] = useState(
+    () => queries.map(q => ({ ...q, query: q.query || '', approved: true }))
   );
 
+  const handleQueryChange = (index, newQuery) => {
+    setEditedQueries(prev => 
+      prev.map((q, i) => i === index ? { ...q, query: newQuery } : q)
+    );
+  };
+
   const handleConfirm = () => {
-    const newQueryStrings = editedText.split('\n').filter(q => q.trim() !== '');
-    const confirmedQueries = newQueryStrings.map((queryString, index) => ({
-      query: queryString,
-      field_name: queries[index] ? queries[index].field_name : `query_${index + 1}`,
-      approved: true,
-    }));
+    const confirmedQueries = editedQueries.filter(q => q.query.trim() !== '');
     onConfirm(confirmedQueries);
   };
 
@@ -46,19 +47,28 @@ const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel, isReadonly = false 
       <div className="editor-header">
         <h3>{isReadonly ? 'Onaylanan Arama Sorguları' : 'Arama Sorgularını Onaylayın'}</h3>
         {!isReadonly && (
-          <p>Ajan aşağıdaki sorguları kullanmayı öneriyor. Üzerinde değişiklik yapabilir, silebilir veya yeni sorgular ekleyebilirsiniz. (Her sorgu ayrı bir satırda olmalıdır.)</p>
+          <p>Ajan aşağıdaki sorguları öneriyor. İstediğiniz değişiklikleri yapabilirsiniz:</p>
         )}
         {isReadonly && (
-          <p>Bu sorgular ile araştırma yapılıyor:</p>
+          <p>Bu sorgular ile araştırma yapıldı:</p>
         )}
       </div>
-      <textarea
-        className={`query-textarea ${isReadonly ? 'readonly' : ''}`}
-        value={editedText}
-        onChange={isReadonly ? undefined : (e) => setEditedText(e.target.value)}
-        disabled={isReadonly}
-        rows={10}
-      />
+      
+      <div className="queries-list">
+        {editedQueries.map((query, index) => (
+          <div key={index} className="query-item">
+            <label>Sorgu {index + 1}:</label>
+            <input
+              type="text"
+              value={query.query}
+              onChange={isReadonly ? undefined : (e) => handleQueryChange(index, e.target.value)}
+              disabled={isReadonly}
+              className={`query-input ${isReadonly ? 'readonly' : ''}`}
+            />
+          </div>
+        ))}
+      </div>
+      
       {!isReadonly && (
         <div className="editor-footer">
           <button onClick={onCancel} className="btn-cancel">İptal</button>
@@ -97,9 +107,12 @@ function App() {
     }]);
     setIsLoading(false);
     setCurrentStage({ stage: 'error', progress: 0, message: 'Hata oluştu.' });
+    setQueryEditorState('hidden');
+    setCurrentRunId(null);
+    setPendingQueries([]);
   };
 
-  // YENİ: 1. Aşama - Sorgu üretimi
+  // Ana mesaj gönderme işlemi - /chat endpoint'ini kullanır
   const sendMessage = async () => {
     if (input.trim() === '' || isLoading) return;
 
@@ -110,43 +123,76 @@ function App() {
     setIsLoading(true);
     setQueryEditorState('hidden');
     setApprovedQueries([]);
-    setCurrentStage({ stage: 'generate', progress: 25, message: 'Arama sorguları üretiliyor...' });
+    setCurrentStage({ stage: 'init', progress: 0, message: 'İşlem başlatılıyor...' });
 
     try {
-      const response = await fetch('http://localhost:5001/generate-queries', {
+      const response = await fetch('http://localhost:5001/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: currentInput }),
+        body: JSON.stringify({ 
+          message: currentInput,
+          user_id: 'business-proposer-demo',
+          session_id: new Date().getTime().toString()
+        }),
       });
       const data = await response.json();
       
+      // DEBUG: Backend response'unu console'a log et
+      console.log('Backend Response:', data);
+      
       if (response.ok) {
+        // Backend'ten gelen stage bilgilerini güncelle
+        if (data.stage && data.progress !== undefined) {
+          setCurrentStage({
+            stage: data.stage,
+            progress: data.progress,
+            message: data.message || 'İşleniyor...'
+          });
+        }
+
         if (data.is_paused && data.queries && data.queries.length > 0) {
+          // User control flow - kullanıcı onayı gerekiyor
+          console.log('Queries found:', data.queries);
           setPendingQueries(data.queries);
           setCurrentRunId(data.run_id);
           setQueryEditorState('editing');
-          setCurrentStage({ stage: 'approval', progress: 40, message: 'Sorgular onayınızı bekliyor...' });
+          setIsLoading(false);
+        } else if (data.response) {
+          // İşlem tamamlandı
+          const agentMessage = { text: data.response, sender: 'agent', isComplete: true };
+          setMessages(prev => [...prev, agentMessage]);
           setIsLoading(false);
         } else {
+          console.log('Unexpected response format - data:', data);
           throw new Error('Beklenmeyen yanıt formatı');
         }
       } else {
-        throw new Error(data.error || 'Sorgu üretimi sırasında hata oluştu');
+        throw new Error(data.error || 'Bilinmeyen hata oluştu');
       }
     } catch (error) {
-      handleApiError(error, 'sorgu üretimi');
+      handleApiError(error, 'mesaj gönderimi');
     }
   };
 
-  // YENİ: 2. Aşama - Arama yapma
+  // Query onaylama ve devam etme - /resume endpoint'ini kullanır
   const handleQueryConfirmation = async (confirmedQueries) => {
     setApprovedQueries(confirmedQueries);
-    setQueryEditorState('approved');
+    setQueryEditorState('hidden');
+    
+    // Onaylanan sorguları mesaj olarak ekle
+    const approvedQueriesMessage = {
+      text: '',
+      sender: 'queries',
+      isComplete: true,
+      queries: confirmedQueries
+    };
+    setMessages(prev => [...prev, approvedQueriesMessage]);
+    
     setIsLoading(true);
-    setCurrentStage({ stage: 'research', progress: 60, message: 'Onaylanan sorgularla araştırma yapılıyor...' });
+    setCurrentStage({ stage: 'research', progress: 30, message: 'Onaylanan sorgularla araştırma yapılıyor...' });
 
     try {
-      const response = await fetch('http://localhost:5001/execute-search', {
+      const response = await fetch('http://localhost:5001/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -156,42 +202,36 @@ function App() {
       });
       const data = await response.json();
       
-      if (response.ok && data.urls) {
-        // 3. Aşamaya geç - Analiz ve teklif yazımı
-        await analyzeAndPropose(data.urls);
+      if (response.ok) {
+        // Backend'ten gelen stage bilgilerini güncelle
+        if (data.stage && data.progress !== undefined) {
+          setCurrentStage({
+            stage: data.stage,
+            progress: data.progress,
+            message: data.message || 'İşleniyor...'
+          });
+        }
+
+        if (data.response) {
+          // İşlem tamamlandı
+          const agentMessage = { text: data.response, sender: 'agent', isComplete: true };
+          setMessages(prev => [...prev, agentMessage]);
+          setIsLoading(false);
+        } else if (data.is_paused) {
+          // Hala başka bir onay bekleniyor (olası ama beklenmez)
+          setCurrentRunId(data.run_id);
+          setIsLoading(false);
+        } else {
+          throw new Error('Beklenmeyen yanıt formatı');
+        }
       } else {
-        throw new Error(data.error || 'Arama sırasında hata oluştu');
+        throw new Error(data.error || 'Devam etme sırasında hata oluştu');
       }
     } catch (error) {
-      handleApiError(error, 'arama işlemi');
+      handleApiError(error, 'sorgu onaylama');
     } finally {
       setCurrentRunId(null);
       setPendingQueries([]);
-    }
-  };
-
-  // YENİ: 3. Aşama - Analiz ve teklif yazımı
-  const analyzeAndPropose = async (urls) => {
-    setCurrentStage({ stage: 'analyze', progress: 80, message: 'İçerik analiz ediliyor ve teklif yazılıyor...' });
-
-    try {
-      const response = await fetch('http://localhost:5001/analyze-and-propose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: urls }),
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.proposal) {
-        const agentMessage = { text: data.proposal, sender: 'agent', isComplete: true };
-        setMessages(prev => [...prev, agentMessage]);
-        setCurrentStage({ stage: 'completed', progress: 100, message: 'İş teklifi başarıyla tamamlandı!' });
-        setIsLoading(false);
-      } else {
-        throw new Error(data.error || 'Analiz ve teklif yazımı sırasında hata oluştu');
-      }
-    } catch (error) {
-      handleApiError(error, 'analiz ve teklif yazımı');
     }
   };
   
@@ -223,28 +263,36 @@ function App() {
         </div>
         
         <div className="messages">
-          {messages.map((msg, index) => (
-            <div key={index} className={`message ${msg.sender}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-            </div>
-          ))}
+          {messages.map((msg, index) => {
+            if (msg.sender === 'queries') {
+              // Onaylanan sorguları özel component olarak render et
+              return (
+                <div key={index}>
+                  <QueryEditor
+                    queries={msg.queries}
+                    onConfirm={() => {}}
+                    onCancel={() => {}}
+                    isReadonly={true}
+                  />
+                </div>
+              );
+            }
+            
+            // Normal mesajları render et
+            return (
+              <div key={index} className={`message ${msg.sender}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+              </div>
+            );
+          })}
 
-          {/* Query Editor - editing veya approved modda gösteriliyor */}
+          {/* Query Editor - sadece editing modda gösteriliyor */}
           {queryEditorState === 'editing' && (
-            <EmbeddedQueryEditor
+            <QueryEditor
               queries={pendingQueries}
               onConfirm={handleQueryConfirmation}
               onCancel={handleQueryCancel}
               isReadonly={false}
-            />
-          )}
-          
-          {queryEditorState === 'approved' && (
-            <EmbeddedQueryEditor
-              queries={approvedQueries}
-              onConfirm={() => {}}
-              onCancel={() => {}}
-              isReadonly={true}
             />
           )}
 
