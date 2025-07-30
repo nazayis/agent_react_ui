@@ -1,0 +1,374 @@
+/* App.css - Tam ve Güncel Versiyon */
+
+/* Genel Sayfa ve Koyu Tema Ayarları */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1c1c1e; /* Koyu tema ana arka plan */
+  color: #f5f5f7; /* Genel metin rengi */
+}
+
+/* Ana Uygulama Container'ı */
+.app-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex; /* Sidebar ve chat container'ı yan yana getirmek için */
+}
+
+/* Hamburger Menü Butonu */
+.hamburger-button {
+  position: fixed;
+  top: 15px;
+  left: 15px;
+  z-index: 1000;
+  background: rgba(44, 44, 46, 0.8); /* Yarı saydam koyu arkaplan */
+  border: 1px solid rgba(80, 80, 80, 0.5);
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px); /* iOS stili blur efekti */
+}
+
+.hamburger-icon {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 24px;
+  height: 18px;
+}
+
+.hamburger-icon span {
+  display: block;
+  height: 2px;
+  width: 100%;
+  background-color: #f5f5f7; /* Beyaz ikon çizgileri */
+  border-radius: 1px;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Sidebar */
+.sidebar {
+  flex-shrink: 0; /* Küçülmesini engelle */
+  width: 280px;
+  height: 100vh;
+  background-color: #2c2c2e; /* Sidebar arkaplanı */
+  box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+  transform: translateX(-100%); /* Başlangıçta gizli */
+  transition: transform 0.3s ease-in-out;
+  z-index: 999;
+  position: absolute; /* Akışı bozmaması için */
+  top: 0;
+  left: 0;
+}
+
+.sidebar.open {
+  transform: translateX(0); /* Açıldığında görünür yap */
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid #3a3a3c;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  color: #f5f5f7;
+}
+
+.sidebar-content {
+  padding: 20px;
+}
+
+.sidebar-content ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar-content li {
+  padding: 15px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+  color: #f5f5f7;
+}
+
+.sidebar-content li:hover {
+  background-color: #3a3a3c;
+}
+
+
+/* Chat Container */
+.chat-container {
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #1c1c1e; /* Chat arkaplanı */
+  transition: margin-left 0.3s ease-in-out;
+}
+
+.header {
+  padding: 15px 20px;
+  background-color: #1c1c1e;
+  text-align: center;
+  border-bottom: 1px solid #3a3a3c;
+  flex-shrink: 0; /* Küçülmesini engelle */
+}
+
+.header p {
+  margin: 0;
+  padding: 10px 20px;
+  display: inline-block;
+  background-color: #2c2c2e;
+  border-radius: 8px;
+  border: 1px solid #3a3a3c;
+  font-size: 1rem;
+}
+
+/* Mesajlar Alanı */
+.messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.message {
+  padding: 12px 18px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  max-width: 75%;
+  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+/* Markdown Stilleri */
+.message p { margin: 0 0 10px 0; }
+.message p:last-child { margin-bottom: 0; }
+.message h1, .message h2, .message h3 { margin: 15px 0 10px 0; border-bottom: 1px solid #444; padding-bottom: 5px; }
+.message ul, .message ol { margin: 10px 0; padding-left: 25px; }
+.message li { margin-bottom: 5px; }
+.message a { color: #0a84ff; text-decoration: none; }
+.message a:hover { text-decoration: underline; }
+.message code { font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; background-color: rgba(255, 255, 255, 0.1); padding: 3px 6px; border-radius: 6px; font-size: 0.9em; }
+.message pre { margin: 10px 0; padding: 15px; background-color: rgba(0, 0, 0, 0.2); border-radius: 8px; overflow-x: auto; }
+.message pre code { background-color: transparent; padding: 0; }
+
+.table-container { overflow-x: auto; margin: 10px 0; }
+.markdown-table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+.markdown-table th, .markdown-table td { border: 1px solid #444; padding: 10px; text-align: left; }
+.markdown-table th { background-color: rgba(255, 255, 255, 0.05); }
+
+.message.user {
+  background-color: #007aff; /* iOS mavi */
+  color: white;
+  align-self: flex-end;
+  margin-left: 25%;
+}
+
+.message.agent {
+  background-color: #3a3a3c;
+  color: #f5f5f7;
+  align-self: flex-start;
+  margin-right: 25%;
+}
+
+/* Gömülü Editör Stilleri */
+.embedded-editor-container {
+  background-color: #2c2c2e;
+  border: 1px solid #444;
+  border-radius: 12px;
+  padding: 24px;
+  margin: 20px auto;
+  max-width: 80%;
+  width: 100%;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  align-self: center;
+}
+
+.editor-header {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.editor-header h3 {
+  margin: 0 0 8px 0;
+  color: #f5f5f7;
+  font-size: 1.25rem;
+  font-weight: 600;
+  border: none; /* Mesajlardaki h3'ten farklı */
+}
+
+.editor-header p {
+  margin: 0;
+  color: #a0a0a5;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.query-textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.5;
+  background-color: #1c1c1e;
+  color: #f5f5f7;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.query-textarea:focus {
+  outline: none;
+  border-color: #007aff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.editor-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-cancel,
+.btn-confirm {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.btn-cancel {
+  background-color: #555;
+  color: #fff;
+}
+
+.btn-cancel:hover {
+  background-color: #666;
+}
+
+.btn-confirm {
+  background-color: #007aff;
+  color: white;
+}
+
+.btn-confirm:hover {
+  background-color: #005ecb;
+}
+
+/* Input Alanı */
+.input-area {
+  padding: 20px;
+  background-color: #1c1c1e;
+  border-top: 1px solid #3a3a3c;
+  flex-shrink: 0; /* Küçülmesini engelle */
+}
+
+.input-area input {
+  width: 100%;
+  padding: 15px;
+  border: 1px solid #3a3a3c;
+  border-radius: 8px;
+  font-size: 1rem;
+  margin-bottom: 10px;
+  background-color: #2c2c2e;
+  color: #f5f5f7;
+  box-sizing: border-box;
+}
+
+.input-area input::placeholder {
+    color: #8e8e93;
+}
+
+.input-area input:focus {
+    outline: none;
+    border-color: #007aff;
+}
+
+.input-area button {
+  width: 100%;
+  padding: 15px;
+  background-color: #007aff;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.input-area button:hover:not(:disabled) {
+  background-color: #005ecb;
+}
+
+.input-area button:disabled {
+  background-color: #555;
+  color: #999;
+  cursor: not-allowed;
+}
+
+/* Progress Indicator */
+.progress-container {
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #2c2c2e;
+  border-radius: 8px;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: #3a3a3c;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: #007aff;
+  transition: width 0.5s ease-in-out;
+}
+
+.progress-stages {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+  padding: 0 10px;
+}
+
+.stage {
+  font-size: 12px;
+  color: #8e8e93;
+  position: relative;
+  text-align: center;
+  flex: 1;
+}
+
+.stage.active {
+  color: #007aff;
+  font-weight: 500;
+}
+
+.progress-message {
+  text-align: center;
+  color: #8e8e93;
+  font-size: 14px;
+  margin-top: 10px;
+  font-style: italic;
+}
