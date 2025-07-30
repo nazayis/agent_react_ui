@@ -80,7 +80,8 @@ def read_articles(urls: list[str]) -> str:
 
 # ==============================================================================
 # STEP 1: GENERATE QUERIES AND PAUSE FOR APPROVAL
-# ==============================================================================
+# ============================================================================== 2 agent | 1 Agent --> market research & gerekli linkleri çıkart, okumayı yap, analiz  --> MCPye ihtiyacı yok GoogleSearchTools()
+# ------------------------------------------------------------------------------         | 1 Agent --> sonuçları incele, proposal'ı yaz, MCP'ye bas | MCPye ihtiyacı var --> MCPTools()
 
 @app.route('/generate-queries', methods=['POST'])
 def generate_queries_endpoint():
@@ -198,7 +199,6 @@ def analyze_and_propose_endpoint():
                     "6. Return ONLY the proposal text ONLY ONCE without any additional commentary or analysis.",
                     "IMPORTANT: Do not repeat the proposal text. Return it only once at the end.",
                     "CRITICAL: Call read_articles separately for each URL to avoid token limits. Do NOT pass all URLs at once.",
-
                 ],
                 session_id=session_id,
                 debug_mode=True
