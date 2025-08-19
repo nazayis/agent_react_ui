@@ -107,8 +107,7 @@ def generate_plan_endpoint():
                 "",
                 "Yanıtını şu anahtarları içeren JSON yapısı olarak formatla:",
                 "- research_queries: arama sorgusu dizileri",
-                "- analysis_focus: analiz noktaları dizisi", 
-                "- output_format: beklenen çıktıyı açıklayan metin",
+                "- analysis_focus: analiz noktaları dizisi",
                 "",
                 "Planı kapsamlı ama uygulanabilir yap. İş zekası toplamaya odaklan.",
                 "SADECE JSON yapısı ile yanıtla, ek metin ekleme."
@@ -137,9 +136,7 @@ def generate_plan_endpoint():
                 'plan': {
                     'raw_plan': response.content,
                     'research_queries': [],
-                    'analysis_focus': [],
-                    'output_format': 'Business proposal in Turkish',
-                    'estimated_duration': 'Unknown'
+                    'analysis_focus': []
                 },
                 'session_id': session_id,
                 'message': 'Plan generated. Please structure the plan data manually.'
@@ -155,12 +152,38 @@ def execute_plan_endpoint():
     if not plan:
         return jsonify({'error': 'Plan cannot be empty'}), 400
         
+    # Sanitize queries and analysis focus: trim, remove empty, de-duplicate, cap to 5
+    raw_queries = plan.get('research_queries', []) if isinstance(plan, dict) else []
+    queries = []
+    seen = set()
+    if isinstance(raw_queries, list):
+        for q in raw_queries:
+            if isinstance(q, str):
+                t = q.strip()
+                if t and t not in seen:
+                    seen.add(t)
+                    queries.append(t)
+    queries = queries[:5]
+
+    raw_focus = plan.get('analysis_focus', []) if isinstance(plan, dict) else []
+    focuses = []
+    if isinstance(raw_focus, list):
+        for f in raw_focus:
+            if isinstance(f, str):
+                t = f.strip()
+                if t:
+                    focuses.append(t)
+
+    sanitized_plan = {
+        'research_queries': queries,
+        'analysis_focus': focuses
+    }
+    
     session_id = str(uuid.uuid4())
     user_id = f"user_{session_id}"
 
     async def _run():
         async with MCPTools(f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}", timeout_seconds=30) as fs_tools:
-            
             # 1. Araştırma ve Toplama Ajanı
             searcher = Agent(
                 name="Araştırmacı",
@@ -168,7 +191,9 @@ def execute_plan_endpoint():
                 tools=[GoogleSearchTools()],
                 instructions=[
                     "Sen bir Araştırmacısın. Verilen arama sorgularını çalıştırıp URL'leri toplarsın.",
-                    "Her sorgu için 2 alakalı URL bul ve listele.",
+                    "Frontend'de onaylanan arama sorgularını esas alarak en etkin arama sorgularını oluştur",
+                    "Toplam arama sorgusu 5'i GEÇMEMELİ. 5'ten fazlaysa en alakalı 5'ini seç ve yalnızca onlar için sonuç topla.",
+                    "Her sorgu için en alakalı 3 URL bul ve listele.",
                     "YASAK: Öneri yapma, izin isteme, yorum ekleme.",
                 ],
                 markdown=True,
@@ -209,26 +234,44 @@ def execute_plan_endpoint():
                 model=OpenAIChat(id="gpt-5-nano"),
                 tools=[fs_tools],
                 instructions=[
-                    "Sen bir İş Stratejistisisin. Analiz sonuçlarından iş planı hazırlarsın.",
+                    "Sen bir İş Stratejistisisin. Analiz sonuçlarından 3 ayrı dosya hazırlarsın.",
                     "",
-                    "GÖREV: Şu 9 bölümü içeren iş planını yaz ve kaydet:",
-                    "1. YÖNETİCİ ÖZETİ",
-                    "2. ANALİZ BULGULARI", 
-                    "3. KARAR VERİ SÜRECİ",
-                    "4. STRATEJİK KARARLAR",
-                    "5. HEDEFLENEn SONUÇLAR",
-                    "6. UYGULAMA PLANI",
-                    "7. ZAMAN ÇİZELGESİ",
-                    "8. RİSK ANALİZİ",
-                    "9. KAYNAK İHTİYAÇLARI",
+                    "GÖREV: Şu 3 dosyayı sırasıyla oluştur:",
+                    "",
+                    "1. DOSYA: 'output/pain_points.md'",
+                    "İÇERİK:",
+                    "- Proje fikrinin acı noktaları",
+                    "- Competitor'ların yaptıkları analizi",
+                    "- Bu sorunların üstesinden gelme yöntemleri",
+                    "- Araştırma aşamasında öğrenilen kritik bilgiler",
+                    "- Pazar eksiklikleri ve fırsatlar",
+                    "",
+                    "2. DOSYA: 'output/roadmap.xlsx'", 
+                    "İÇERİK (CSV formatında kaydet):",
+                    "- Hafta bazında görev planı",
+                    "- Development aşamaları (Planning, Design, Development, Testing, Launch)",
+                    "- Her görevin hangi aşamaya ait olduğu",
+                    "- Sorumlu kişi/ekip bilgisi",
+                    "- Başlangıç ve bitiş tarihleri",
+                    "- Öncelik seviyeleri",
+                    "",
+                    "3. DOSYA: 'output/business_strategy.md'",
+                    "İÇERİK (9 ana bölüm):",
+                    "- YÖNETİCİ ÖZETİ",
+                    "- ANALİZ BULGULARI", 
+                    "- KARAR VERİ SÜRECİ",
+                    "- STRATEJİK KARARLAR",
+                    "- HEDEFLENEn SONUÇLAR",
+                    "- UYGULAMA PLANI",
+                    "- ZAMAN ÇİZELGESİ",
+                    "- RİSK ANALİZİ",
+                    "- KAYNAK İHTİYAÇLARI",
                     "",
                     "KURALLAR:",
-                    "- Planı 'output/business_strategy.md' dosyasına kaydet",
+                    "- Üç dosyayı da sırasıyla oluştur ve kaydet",
+                    "- Her dosya detaylı ve kapsamlı olmalı",
+                    "- Roadmap dosyasını CSV formatında kaydet (.xlsx uzantısı ile)",
                     "- İzin isteme, onay bekleme",
-                    "- Ek öneri, seçenek, alternatif sunma",
-                    "- Toplantı, PDF, format önerisi yapma",
-                    "- Uzun açıklama, detay isteme",
-                    "- Sadece planı yaz, kaydet ve bitir",
                     "",
                     "YASAK: İzin isteme, öneri yapma, seçenek sunma.",
                 ],
@@ -244,15 +287,24 @@ def execute_plan_endpoint():
                 "1. Araştırmacı'ya arama sorgularını ver",
                 "2. İçerik Okuyucu'ya URL'leri ver", 
                 "3. Analist'e içerikleri analiz ettir",
-                "4. İş Planı Uzmanı'na final planı hazırlat",
-                "5. 'output/business_strategy.md' dosyasını oku",
+                "4. İş Planı Uzmanı'na 3 dosyayı hazırlat",
+                "5. Oluşturulan 3 dosyayı oku ve özetle",
                 "",
-                "ÇIKTI: Sadece business_strategy.md dosyasının içeriğini paylaş.",
-                "Dosya içeriğini read_file ile oku ve aynen döndür.",
+                "ÇIKTI: 3 dosyanın içeriğini şu format ile paylaş:",
+                "=== PAIN POINTS ===",
+                "[pain_points.md içeriği]",
+                "",
+                "=== ROADMAP ===", 
+                "[roadmap.xlsx içeriği]",
+                "",
+                "=== BUSINESS STRATEGY ===",
+                "[business_strategy.md içeriği]",
+                "",
+                "Her dosyayı read_file ile oku ve aynen döndür.",
                 "",
                 "YASAK: Kendi metin üretme, süreç anlatma, öneri yapma.",
             ]
-            
+
             analysis_team = Team(
                 name="İş Strateji Takımı",
                 mode="coordinate",
@@ -276,12 +328,12 @@ def execute_plan_endpoint():
 UYGULAMA PLANI:
 
 ARAŞTIRMA SORGULARİ:
-{chr(10).join(f"- {query}" for query in plan.get('research_queries', []))}
+{chr(10).join(f"- {query}" for query in sanitized_plan.get('research_queries', []))}
 
 ANALİZ ODAKLARI:
-{chr(10).join(f"- {focus}" for focus in plan.get('analysis_focus', []))}
+{chr(10).join(f"- {focus}" for focus in sanitized_plan.get('analysis_focus', []))}
 
-ÇIKTI FORMATI: {plan.get('output_format', 'İş strateji belgesi')}
+ÇIKTI FORMATI: 3 dosya (pain_points.md, roadmap.xlsx, business_strategy.md)
 """
 
             response = await analysis_team.arun(f"Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:\n{plan_text}")

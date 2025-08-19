@@ -29,9 +29,7 @@ const ProgressIndicator = ({ stage, progress, message }) => {
 const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
   const [editedPlan, setEditedPlan] = useState({
     research_queries: plan?.research_queries || [],
-    analysis_focus: plan?.analysis_focus || [],
-    output_format: plan?.output_format || 'Business proposal in Turkish',
-    estimated_duration: plan?.estimated_duration || 'Unknown'
+    analysis_focus: plan?.analysis_focus || []
   });
 
   const handleQueriesChange = (queries) => {
@@ -182,14 +180,9 @@ const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
             <div className="output-info">
               <div className="output-item">
                 <label>Format:</label>
-                <input
-                  type="text"
-                  className={`output-input ${isReadonly ? 'readonly' : ''}`}
-                  value={editedPlan.output_format}
-                  onChange={isReadonly ? undefined : (e) => setEditedPlan(prev => ({ ...prev, output_format: e.target.value }))}
-                  disabled={isReadonly}
-                  placeholder="Çıktı formatı"
-                />
+                <div className="fixed-format-display">
+                  <span>3 dosya: pain_points.md, roadmap.xlsx, business_strategy.md</span>
+                </div>
               </div>
             </div>
           </div>
@@ -271,7 +264,22 @@ function App() {
 
   // YENİ: 2. Aşama - Plan çalıştırma
   const handlePlanConfirmation = async (confirmedPlan) => {
-    setApprovedPlan(confirmedPlan);
+    // Sanitize queries: trim, remove empty, de-duplicate, cap to 5
+    const sanitizedQueries = Array.from(new Set((confirmedPlan?.research_queries || [])
+      .map(q => (q || '').trim())
+      .filter(q => q)));
+    const limitedQueries = sanitizedQueries.slice(0, 5);
+
+    const sanitizedFocus = (confirmedPlan?.analysis_focus || [])
+      .map(f => (f || '').trim())
+      .filter(f => f);
+
+    const sanitizedPlan = {
+      research_queries: limitedQueries,
+      analysis_focus: sanitizedFocus
+    };
+
+    setApprovedPlan(sanitizedPlan);
     setPlanEditorState('approved');
     setIsLoading(true);
     setCurrentStage({ stage: 'research', progress: 60, message: 'Plan çalıştırılıyor - araştırma başladı...' });
@@ -280,14 +288,13 @@ function App() {
       const response = await fetch('http://localhost:5001/execute-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: confirmedPlan }),
+        body: JSON.stringify({ plan: sanitizedPlan }),
       });
       const data = await response.json();
       
       if (response.ok && data.success) {
         setCurrentStage({ stage: 'analyze', progress: 80, message: 'Analiz tamamlanıyor...' });
         
-        // Kısa bir gecikme sonrası tamamlandı durumuna geç
         setTimeout(() => {
           const agentMessage = { text: data.result, sender: 'agent', isComplete: true };
           setMessages(prev => [...prev, agentMessage]);
