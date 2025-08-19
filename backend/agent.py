@@ -15,6 +15,7 @@ import re
 # --- Agno & OpenAI Libraries ---
 try:
     from agno.agent import Agent
+    from agno.team import Team
     from agno.models.openai import OpenAIChat
     from agno.tools.googlesearch import GoogleSearchTools
     from agno.tools.mcp import MCPTools
@@ -79,12 +80,12 @@ def read_articles(urls: list[str]) -> str:
     return combined_text
 
 # ==============================================================================
-# STEP 1: GENERATE QUERIES AND PAUSE FOR APPROVAL
-# ============================================================================== 2 agent | 1 Agent --> market research & gerekli linkleri çıkart, okumayı yap, analiz  --> MCPye ihtiyacı yok GoogleSearchTools()
-# ------------------------------------------------------------------------------         | 1 Agent --> sonuçları incele, proposal'ı yaz, MCP'ye bas | MCPye ihtiyacı var --> MCPTools()
+# NEW TWO-PHASE SYSTEM: PLAN FIRST, THEN EXECUTE
+# ==============================================================================
 
-@app.route('/generate-queries', methods=['POST'])
-def generate_queries_endpoint():
+# Phase 1: Planning Agent - Creates detailed action plan
+@app.route('/generate-plan', methods=['POST'])
+def generate_plan_endpoint():
     data = request.json
     user_message = data.get('message')
     if not user_message:
@@ -93,121 +94,219 @@ def generate_queries_endpoint():
     session_id = str(uuid.uuid4())
 
     async def _run():
-        # This agent now has a multi-step plan.
-        query_and_search_agent = Agent(
-            model=OpenAIChat(id="gpt-4o-mini"),
-            # Give it all the tools it will need for the entire task.
-            tools=[UserControlFlowTools(), GoogleSearchTools()],
+        planning_agent = Agent(
+            model=OpenAIChat(id="gpt-5-nano"),
+            tools=[],  # Planning agent doesn't need external tools
             instructions=[
-                "You have a two-step job.",
-                "STEP 1: Take a topic from the user, generate 5 relevant Google search queries, and then immediately call the `get_user_input` tool to get user approval for these queries. Put each generated query into the `field_description` of a separate field.",
-                "STEP 2: After the user approves the queries, you will receive them as the result of the tool call. Then, for each approved query, execute a `google_search` and collect the most relevant 3 of the resulting URLs.",
-                "Finally, output a single, flat list of all the URLs you found. Your final output must only be the list of URLs."
+                "Sen iş araştırması ve teklif oluşturma için Stratejik Planlama Ajanısın.",
+                "Görevin kullanıcının isteğine dayalı olarak detaylı, yapılandırılmış bir eylem planı oluşturmaktır.",
+                "Planı şu yapıda oluştur:",
+                "1. ARAŞTIRMA_AŞAMASI: Pazar araştırması için 5-7 spesifik Google arama sorgusu oluştur",
+                "2. ANALİZ_AŞAMASI: Toplanan verilerden hangi yönlerin analiz edileceğini tanımla",
+                "3. ÇIKTI_AŞAMASI: Son teslimerin türü ve formatını belirle",
+                "",
+                "Yanıtını şu anahtarları içeren JSON yapısı olarak formatla:",
+                "- research_queries: arama sorgusu dizileri",
+                "- analysis_focus: analiz noktaları dizisi", 
+                "- output_format: beklenen çıktıyı açıklayan metin",
+                "",
+                "Planı kapsamlı ama uygulanabilir yap. İş zekası toplamaya odaklan.",
+                "SADECE JSON yapısı ile yanıtla, ek metin ekleme."
             ],
             session_id=session_id,
             debug_mode=True
         )
 
-        response = await query_and_search_agent.arun(user_message)
-
-        if response.is_paused:
-            run_id = response.run_id
-            # Store the agent instance itself to continue its session later
-            pending_runs[run_id] = {'agent': query_and_search_agent}
-
-            queries = []
-            for tool in response.tools_requiring_user_input:
-                if tool.tool_name == 'get_user_input':
-                    for field in tool.user_input_schema:
-                        queries.append({'query': field.description, 'field_name': field.name})
+        response = await planning_agent.arun(user_message)
+        
+        try:
+            # Try to parse the response as JSON
+            import json
+            plan_data = json.loads(response.content)
             
             return jsonify({
-                'is_paused': True,
-                'run_id': run_id,
-                'queries': queries,
-                'message': 'Please approve the search queries.'
+                'success': True,
+                'plan': plan_data,
+                'session_id': session_id,
+                'message': 'Action plan generated successfully. Please review and modify as needed.'
             })
-        
-        return jsonify({'error': "Agent did not pause for user confirmation."}), 500
+        except json.JSONDecodeError:
+            # If not valid JSON, return as structured text
+            return jsonify({
+                'success': True,
+                'plan': {
+                    'raw_plan': response.content,
+                    'research_queries': [],
+                    'analysis_focus': [],
+                    'output_format': 'Business proposal in Turkish',
+                    'estimated_duration': 'Unknown'
+                },
+                'session_id': session_id,
+                'message': 'Plan generated. Please structure the plan data manually.'
+            })
 
     return asyncio.run(_run())
 
-# ==============================================================================
-# STEP 2: EXECUTE SEARCH WITH APPROVED QUERIES
-# ==============================================================================
-
-@app.route('/execute-search', methods=['POST'])
-def execute_search_endpoint():
+# Phase 2: Execution Agent - Executes the approved plan without human intervention
+@app.route('/execute-plan', methods=['POST'])
+def execute_plan_endpoint():
     data = request.json
-    run_id = data.get('run_id')
-    approved_queries = data.get('approved_queries', [])
-
-    if not run_id or run_id not in pending_runs:
-        return jsonify({'error': 'Invalid run_id'}), 404
-
-    # Retrieve the agent instance from the previous step
-    run_info = pending_runs.pop(run_id)
-    agent = run_info['agent']
-    
-    run_response = agent.run_response
-    if not run_response or not run_response.is_paused:
-        return jsonify({'error': 'This run is not in a paused state.'}), 400
-
-    async def _run():
-        # Process user approvals from the frontend
-        approved_map = {q['field_name']: q['query'] for q in approved_queries if q.get('approved', True)}
-        for tool in run_response.tools_requiring_user_input:
-            if tool.tool_name == 'get_user_input':
-                for field in tool.user_input_schema:
-                    # Provide the approved query as the 'value' for the input field
-                    field.value = approved_map.get(field.name, "")
-
-        # **FIXED**: Continue the run without the invalid 'user_message' argument.
-        # The agent will now follow STEP 2 of its original instructions.
-        response = await agent.acontinue_run(run_response=run_response)
-
-        # The agent's final content should be the list of URLs
-        return jsonify({'urls': response.content, 'message': 'URLs collected successfully.'})
-
-    return asyncio.run(_run())
-
-# ==============================================================================
-# STEP 3: ANALYZE, PROPOSE, AND SAVE
-# ==============================================================================
-
-@app.route('/analyze-and-propose', methods=['POST'])
-def analyze_and_propose_endpoint():
-    data = request.json
-    urls = data.get('urls') # This is a text block containing URLs
-    if not urls:
-        return jsonify({'error': 'URL list cannot be empty'}), 400
+    plan = data.get('plan')
+    if not plan:
+        return jsonify({'error': 'Plan cannot be empty'}), 400
         
     session_id = str(uuid.uuid4())
+    user_id = f"user_{session_id}"
 
     async def _run():
         async with MCPTools(f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}", timeout_seconds=30) as fs_tools:
-            orchestrator_agent = Agent(
-                model=OpenAIChat(id="gpt-4o"),
-                tools=[read_articles, fs_tools],
+            
+            # 1. Araştırma ve Toplama Ajanı
+            searcher = Agent(
+                name="Araştırmacı",
+                model=OpenAIChat(id="gpt-5-nano"),
+                tools=[GoogleSearchTools()],
                 instructions=[
-                    "You are a Senior Business Analyst.",
-                    "1. You will be given a block of text containing URLs. Your first step is to extract these URLs.",
-                    "2. For each URL, call `read_articles` with a single URL in a list (e.g., read_articles(['url1']), then read_articles(['url2']), etc.). This prevents token limit issues.",
-                    "3. Analyze the combined content from all URLs to identify key market insights, competitors, and opportunities.",
-                    "4. Write a comprehensive, investor-ready business proposal in Turkish based on your analysis.",
-                    "5. Call `write_file` to save the proposal to 'output/business_proposal.md'.",
-                    "6. Return ONLY the proposal text ONLY ONCE without any additional commentary or analysis.",
-                    "IMPORTANT: Do not repeat the proposal text. Return it only once at the end.",
-                    "CRITICAL: Call read_articles separately for each URL to avoid token limits. Do NOT pass all URLs at once.",
+                    "Sen bir Araştırmacısın. Verilen arama sorgularını çalıştırıp URL'leri toplarsın.",
+                    "Her sorgu için 2 alakalı URL bul ve listele.",
+                    "YASAK: Öneri yapma, izin isteme, yorum ekleme.",
                 ],
+                markdown=True,
+                debug_mode=True
+            )
+            
+            # 2. İçerik Okuma Ajanı  
+            reader = Agent(
+                name="İçerik Okuyucu",
+                model=OpenAIChat(id="gpt-5-nano"),
+                tools=[read_articles],
+                instructions=[
+                    "Sen bir İçerik Okuyucusun. Verilen URL'lerdeki içerikleri okur ve özetlersin.",
+                    "Her URL'yi ayrı ayrı oku ve içeriği özetle.",
+                    "YASAK: Yorum yapma, öneri sunma, izin isteme.",
+                ],
+                markdown=True,
+                debug_mode=True
+            )
+            
+            # 3. Analiz Ajanı
+            analyzer = Agent(
+                name="Analist",
+                model=OpenAIChat(id="gpt-5-nano"),
+                tools=[],
+                instructions=[
+                    "Sen bir İş Analistisisin. Verilen içerikleri analiz eder ve bulgularını raporlarsın.",
+                    "Pazar trendleri, fırsatlar ve rakip analizi yap.",
+                    "YASAK: Ek öneri sunma, izin isteme, yorum ekleme.",
+                ],
+                markdown=True,
+                debug_mode=True
+            )
+            
+            # 4. İş Planı ve Strateji Uzmanı
+            proposer = Agent(
+                name="İş Planı Uzmanı",
+                model=OpenAIChat(id="gpt-5-nano"),
+                tools=[fs_tools],
+                instructions=[
+                    "Sen bir İş Stratejistisisin. Analiz sonuçlarından iş planı hazırlarsın.",
+                    "",
+                    "GÖREV: Şu 9 bölümü içeren iş planını yaz ve kaydet:",
+                    "1. YÖNETİCİ ÖZETİ",
+                    "2. ANALİZ BULGULARI", 
+                    "3. KARAR VERİ SÜRECİ",
+                    "4. STRATEJİK KARARLAR",
+                    "5. HEDEFLENEn SONUÇLAR",
+                    "6. UYGULAMA PLANI",
+                    "7. ZAMAN ÇİZELGESİ",
+                    "8. RİSK ANALİZİ",
+                    "9. KAYNAK İHTİYAÇLARI",
+                    "",
+                    "KURALLAR:",
+                    "- Planı 'output/business_strategy.md' dosyasına kaydet",
+                    "- İzin isteme, onay bekleme",
+                    "- Ek öneri, seçenek, alternatif sunma",
+                    "- Toplantı, PDF, format önerisi yapma",
+                    "- Uzun açıklama, detay isteme",
+                    "- Sadece planı yaz, kaydet ve bitir",
+                    "",
+                    "YASAK: İzin isteme, öneri yapma, seçenek sunma.",
+                ],
+                markdown=True,
+                debug_mode=True
+            )
+            
+            # Takım Koordinatörü
+            team_instructions = [
+                "Sen bir Proje Koordinatörüsün. Takımı yönetir ve görevleri sırayla dağıtırsın.",
+                "",
+                "GÖREV: Şu adımları takip et:",
+                "1. Araştırmacı'ya arama sorgularını ver",
+                "2. İçerik Okuyucu'ya URL'leri ver", 
+                "3. Analist'e içerikleri analiz ettir",
+                "4. İş Planı Uzmanı'na final planı hazırlat",
+                "5. 'output/business_strategy.md' dosyasını oku",
+                "",
+                "ÇIKTI: Sadece business_strategy.md dosyasının içeriğini paylaş.",
+                "Dosya içeriğini read_file ile oku ve aynen döndür.",
+                "",
+                "YASAK: Kendi metin üretme, süreç anlatma, öneri yapma.",
+            ]
+            
+            analysis_team = Team(
+                name="İş Strateji Takımı",
+                mode="coordinate",
+                model=OpenAIChat(id="gpt-5-nano"),
+                members=[searcher, reader, analyzer, proposer],
+                tools=[fs_tools],
+                user_id=user_id,
                 session_id=session_id,
+                description=(
+                    "Sen bir Proje Koordinatörüsün. Takımı yönetir ve verilen planı uygularsın."
+                ),
+                instructions=team_instructions,
+                add_datetime_to_instructions=True,
+                enable_agentic_context=True,
+                markdown=True,
                 debug_mode=True
             )
 
-            response = await orchestrator_agent.arun(f"Analyze the content from these URLs and write a proposal: {urls}")
-            return jsonify({'proposal': response.content, 'message': 'Business proposal created and saved successfully.'})
+            # Convert plan to a readable format for the team
+            plan_text = f"""
+UYGULAMA PLANI:
+
+ARAŞTIRMA SORGULARİ:
+{chr(10).join(f"- {query}" for query in plan.get('research_queries', []))}
+
+ANALİZ ODAKLARI:
+{chr(10).join(f"- {focus}" for focus in plan.get('analysis_focus', []))}
+
+ÇIKTI FORMATI: {plan.get('output_format', 'İş strateji belgesi')}
+"""
+
+            response = await analysis_team.arun(f"Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:\n{plan_text}")
+            
+            return jsonify({
+                'success': True,
+                'result': response.content,
+                'session_id': session_id,
+                'message': 'Plan takım tarafından başarıyla uygulandı. İş stratejisi tamamlandı ve kaydedildi.'
+            })
 
     return asyncio.run(_run())
+
+# Legacy endpoint for backward compatibility (can be removed later)
+@app.route('/generate-queries', methods=['POST'])
+def generate_queries_endpoint():
+    return jsonify({'error': 'This endpoint is deprecated. Use /generate-plan instead.'}), 410
+
+@app.route('/execute-search', methods=['POST']) 
+def execute_search_endpoint():
+    return jsonify({'error': 'This endpoint is deprecated. Use /execute-plan instead.'}), 410
+
+@app.route('/analyze-and-propose', methods=['POST'])
+def analyze_and_propose_endpoint():
+    return jsonify({'error': 'This endpoint is deprecated. Use /execute-plan instead.'}), 410
 
 
 if __name__ == '__main__':

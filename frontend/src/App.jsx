@@ -1,4 +1,4 @@
-// App.jsx - Yeni 3-Aşamalı Endpoint Versiyonu
+// App.jsx - Yeni İki Aşamalı Sistem: Plan + Execution
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -14,8 +14,8 @@ const ProgressIndicator = ({ stage, progress, message }) => {
       </div>
       <div className="progress-stages">
         <div className={`stage ${progress >= 0 ? 'active' : ''}`}>Başlangıç</div>
-        <div className={`stage ${progress >= 25 ? 'active' : ''}`}>Sorgu Üretimi</div>
-        <div className={`stage ${progress >= 40 ? 'active' : ''}`}>Onay</div>
+        <div className={`stage ${progress >= 25 ? 'active' : ''}`}>Plan Üretimi</div>
+        <div className={`stage ${progress >= 40 ? 'active' : ''}`}>Plan Onayı</div>
         <div className={`stage ${progress >= 60 ? 'active' : ''}`}>Araştırma</div>
         <div className={`stage ${progress >= 80 ? 'active' : ''}`}>Analiz & Yazım</div>
         <div className={`stage ${progress >= 100 ? 'active' : ''}`}>Tamamlandı</div>
@@ -25,44 +25,181 @@ const ProgressIndicator = ({ stage, progress, message }) => {
   );
 };
 
-// Gömülü Query Editor - Hem editable hem readonly modda çalışıyor
-const EmbeddedQueryEditor = ({ queries, onConfirm, onCancel, isReadonly = false }) => {
-  const [editedText, setEditedText] = useState(
-    () => queries.map(q => q.query).join('\n')
-  );
+// Plan Editor - Step-by-step görsel akış tasarımı
+const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
+  const [editedPlan, setEditedPlan] = useState({
+    research_queries: plan?.research_queries || [],
+    analysis_focus: plan?.analysis_focus || [],
+    output_format: plan?.output_format || 'Business proposal in Turkish',
+    estimated_duration: plan?.estimated_duration || 'Unknown'
+  });
+
+  const handleQueriesChange = (queries) => {
+    setEditedPlan(prev => ({ ...prev, research_queries: queries }));
+  };
+
+  const handleAnalysisChange = (focuses) => {
+    setEditedPlan(prev => ({ ...prev, analysis_focus: focuses }));
+  };
 
   const handleConfirm = () => {
-    const newQueryStrings = editedText.split('\n').filter(q => q.trim() !== '');
-    const confirmedQueries = newQueryStrings.map((queryString, index) => ({
-      query: queryString,
-      field_name: queries[index] ? queries[index].field_name : `query_${index + 1}`,
-      approved: true,
+    onConfirm(editedPlan);
+  };
+
+  const addQuery = () => {
+    setEditedPlan(prev => ({ 
+      ...prev, 
+      research_queries: [...prev.research_queries, ''] 
     }));
-    onConfirm(confirmedQueries);
+  };
+
+  const updateQuery = (index, value) => {
+    const newQueries = [...editedPlan.research_queries];
+    newQueries[index] = value;
+    handleQueriesChange(newQueries);
+  };
+
+  const removeQuery = (index) => {
+    const newQueries = editedPlan.research_queries.filter((_, i) => i !== index);
+    handleQueriesChange(newQueries);
+  };
+
+  const addAnalysis = () => {
+    setEditedPlan(prev => ({ 
+      ...prev, 
+      analysis_focus: [...prev.analysis_focus, ''] 
+    }));
+  };
+
+  const updateAnalysis = (index, value) => {
+    const newFocuses = [...editedPlan.analysis_focus];
+    newFocuses[index] = value;
+    handleAnalysisChange(newFocuses);
+  };
+
+  const removeAnalysis = (index) => {
+    const newFocuses = editedPlan.analysis_focus.filter((_, i) => i !== index);
+    handleAnalysisChange(newFocuses);
   };
 
   return (
-    <div className={`embedded-editor-container ${isReadonly ? 'readonly' : ''}`}>
-      <div className="editor-header">
-        <h3>{isReadonly ? 'Onaylanan Arama Sorguları' : 'Arama Sorgularını Onaylayın'}</h3>
+    <div className={`step-flow-container ${isReadonly ? 'readonly' : ''}`}>
+      <div className="step-flow-header">
+        <h3>{isReadonly ? 'Onaylanan Çalışma Planı' : 'Çalışma Planını Düzenleyin'}</h3>
         {!isReadonly && (
-          <p>Ajan aşağıdaki sorguları kullanmayı öneriyor. Üzerinde değişiklik yapabilir, silebilir veya yeni sorgular ekleyebilirsiniz. (Her sorgu ayrı bir satırda olmalıdır.)</p>
-        )}
-        {isReadonly && (
-          <p>Bu sorgular ile araştırma yapılıyor:</p>
+          <p>Her adımı düzenleyebilirsiniz. Tamamlandığında sistem bu planı otomatik olarak çalıştıracak.</p>
         )}
       </div>
-      <textarea
-        className={`query-textarea ${isReadonly ? 'readonly' : ''}`}
-        value={editedText}
-        onChange={isReadonly ? undefined : (e) => setEditedText(e.target.value)}
-        disabled={isReadonly}
-        rows={10}
-      />
+
+      <div className="step-flow-content">
+        {/* Step 1: Araştırma */}
+        <div className="step-item">
+          <div className="step-box">
+            <div className="step-number">1</div>
+            <div className="step-title">Araştırma</div>
+          </div>
+          <div className="step-connector"></div>
+          <div className="step-editor">
+            <h4>Arama Sorguları</h4>
+            <div className="query-list">
+              {editedPlan.research_queries.map((query, index) => (
+                <div key={index} className="query-item">
+                  <input
+                    type="text"
+                    className={`query-input ${isReadonly ? 'readonly' : ''}`}
+                    value={query}
+                    onChange={isReadonly ? undefined : (e) => updateQuery(index, e.target.value)}
+                    disabled={isReadonly}
+                    placeholder={`Arama sorgusu ${index + 1}`}
+                  />
+                  {!isReadonly && (
+                    <button 
+                      className="remove-btn"
+                      onClick={() => removeQuery(index)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!isReadonly && (
+                <button className="add-btn" onClick={addQuery} type="button">
+                  + Yeni Sorgu Ekle
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Step 2: Analiz */}
+        <div className="step-item">
+          <div className="step-box">
+            <div className="step-number">2</div>
+            <div className="step-title">Analiz</div>
+          </div>
+          <div className="step-connector"></div>
+          <div className="step-editor">
+            <h4>Analiz Odakları</h4>
+            <div className="analysis-list">
+              {editedPlan.analysis_focus.map((focus, index) => (
+                <div key={index} className="analysis-item">
+                  <input
+                    type="text"
+                    className={`analysis-input ${isReadonly ? 'readonly' : ''}`}
+                    value={focus}
+                    onChange={isReadonly ? undefined : (e) => updateAnalysis(index, e.target.value)}
+                    disabled={isReadonly}
+                    placeholder={`Analiz odağı ${index + 1}`}
+                  />
+                  {!isReadonly && (
+                    <button 
+                      className="remove-btn"
+                      onClick={() => removeAnalysis(index)}
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+              {!isReadonly && (
+                <button className="add-btn" onClick={addAnalysis} type="button">
+                  + Yeni Analiz Odağı Ekle
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Step 3: Çıktı */}
+        <div className="step-item">
+          <div className="step-box">
+            <div className="step-number">3</div>
+            <div className="step-title">Çıktı</div>
+          </div>
+          <div className="step-editor">
+            <div className="output-info">
+              <div className="output-item">
+                <label>Format:</label>
+                <input
+                  type="text"
+                  className={`output-input ${isReadonly ? 'readonly' : ''}`}
+                  value={editedPlan.output_format}
+                  onChange={isReadonly ? undefined : (e) => setEditedPlan(prev => ({ ...prev, output_format: e.target.value }))}
+                  disabled={isReadonly}
+                  placeholder="Çıktı formatı"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {!isReadonly && (
-        <div className="editor-footer">
+        <div className="step-flow-footer">
           <button onClick={onCancel} className="btn-cancel">İptal</button>
-          <button onClick={handleConfirm} className="btn-confirm">Onayla ve Devam Et</button>
+          <button onClick={handleConfirm} className="btn-confirm">Planı Onayla ve Başlat</button>
         </div>
       )}
     </div>
@@ -76,17 +213,16 @@ function App() {
   const messagesEndRef = useRef(null);
 
   // State yönetimi
-  const [queryEditorState, setQueryEditorState] = useState('hidden'); // 'hidden', 'editing', 'approved'
-  const [pendingQueries, setPendingQueries] = useState([]);
-  const [approvedQueries, setApprovedQueries] = useState([]);
-  const [currentRunId, setCurrentRunId] = useState(null);
+  const [planEditorState, setPlanEditorState] = useState('hidden'); // 'hidden', 'editing', 'approved'
+  const [pendingPlan, setPendingPlan] = useState(null);
+  const [approvedPlan, setApprovedPlan] = useState(null);
   
   const [currentStage, setCurrentStage] = useState({ stage: 'init', progress: 0, message: 'Hazırlanıyor...' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, queryEditorState]);
+  }, [messages, planEditorState]);
 
   const handleApiError = (error, context) => {
     console.error(`API Hatası (${context}):`, error);
@@ -99,7 +235,7 @@ function App() {
     setCurrentStage({ stage: 'error', progress: 0, message: 'Hata oluştu.' });
   };
 
-  // YENİ: 1. Aşama - Sorgu üretimi
+  // YENİ: 1. Aşama - Plan üretimi
   const sendMessage = async () => {
     if (input.trim() === '' || isLoading) return;
 
@@ -108,99 +244,71 @@ function App() {
     const currentInput = input;
     setInput('');
     setIsLoading(true);
-    setQueryEditorState('hidden');
-    setApprovedQueries([]);
-    setCurrentStage({ stage: 'generate', progress: 25, message: 'Arama sorguları üretiliyor...' });
+    setPlanEditorState('hidden');
+    setApprovedPlan(null);
+    setCurrentStage({ stage: 'generate', progress: 25, message: 'Çalışma planı üretiliyor...' });
 
     try {
-      const response = await fetch('http://localhost:5001/generate-queries', {
+      const response = await fetch('http://localhost:5001/generate-plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: currentInput }),
       });
       const data = await response.json();
       
-      if (response.ok) {
-        if (data.is_paused && data.queries && data.queries.length > 0) {
-          setPendingQueries(data.queries);
-          setCurrentRunId(data.run_id);
-          setQueryEditorState('editing');
-          setCurrentStage({ stage: 'approval', progress: 40, message: 'Sorgular onayınızı bekliyor...' });
-          setIsLoading(false);
-        } else {
-          throw new Error('Beklenmeyen yanıt formatı');
-        }
-      } else {
-        throw new Error(data.error || 'Sorgu üretimi sırasında hata oluştu');
-      }
-    } catch (error) {
-      handleApiError(error, 'sorgu üretimi');
-    }
-  };
-
-  // YENİ: 2. Aşama - Arama yapma
-  const handleQueryConfirmation = async (confirmedQueries) => {
-    setApprovedQueries(confirmedQueries);
-    setQueryEditorState('approved');
-    setIsLoading(true);
-    setCurrentStage({ stage: 'research', progress: 60, message: 'Onaylanan sorgularla araştırma yapılıyor...' });
-
-    try {
-      const response = await fetch('http://localhost:5001/execute-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          run_id: currentRunId,
-          approved_queries: confirmedQueries
-        }),
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.urls) {
-        // 3. Aşamaya geç - Analiz ve teklif yazımı
-        await analyzeAndPropose(data.urls);
-      } else {
-        throw new Error(data.error || 'Arama sırasında hata oluştu');
-      }
-    } catch (error) {
-      handleApiError(error, 'arama işlemi');
-    } finally {
-      setCurrentRunId(null);
-      setPendingQueries([]);
-    }
-  };
-
-  // YENİ: 3. Aşama - Analiz ve teklif yazımı
-  const analyzeAndPropose = async (urls) => {
-    setCurrentStage({ stage: 'analyze', progress: 80, message: 'İçerik analiz ediliyor ve teklif yazılıyor...' });
-
-    try {
-      const response = await fetch('http://localhost:5001/analyze-and-propose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: urls }),
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.proposal) {
-        const agentMessage = { text: data.proposal, sender: 'agent', isComplete: true };
-        setMessages(prev => [...prev, agentMessage]);
-        setCurrentStage({ stage: 'completed', progress: 100, message: 'İş teklifi başarıyla tamamlandı!' });
+      if (response.ok && data.success) {
+        setPendingPlan(data.plan);
+        setPlanEditorState('editing');
+        setCurrentStage({ stage: 'approval', progress: 40, message: 'Plan onayınızı bekliyor...' });
         setIsLoading(false);
       } else {
-        throw new Error(data.error || 'Analiz ve teklif yazımı sırasında hata oluştu');
+        throw new Error(data.error || 'Plan üretimi sırasında hata oluştu');
       }
     } catch (error) {
-      handleApiError(error, 'analiz ve teklif yazımı');
+      handleApiError(error, 'plan üretimi');
+    }
+  };
+
+  // YENİ: 2. Aşama - Plan çalıştırma
+  const handlePlanConfirmation = async (confirmedPlan) => {
+    setApprovedPlan(confirmedPlan);
+    setPlanEditorState('approved');
+    setIsLoading(true);
+    setCurrentStage({ stage: 'research', progress: 60, message: 'Plan çalıştırılıyor - araştırma başladı...' });
+
+    try {
+      const response = await fetch('http://localhost:5001/execute-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: confirmedPlan }),
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setCurrentStage({ stage: 'analyze', progress: 80, message: 'Analiz tamamlanıyor...' });
+        
+        // Kısa bir gecikme sonrası tamamlandı durumuna geç
+        setTimeout(() => {
+          const agentMessage = { text: data.result, sender: 'agent', isComplete: true };
+          setMessages(prev => [...prev, agentMessage]);
+          setCurrentStage({ stage: 'completed', progress: 100, message: 'İş analizi başarıyla tamamlandı!' });
+          setIsLoading(false);
+        }, 2000);
+      } else {
+        throw new Error(data.error || 'Plan çalıştırma sırasında hata oluştu');
+      }
+    } catch (error) {
+      handleApiError(error, 'plan çalıştırma');
+    } finally {
+      setPendingPlan(null);
     }
   };
   
-  const handleQueryCancel = () => {
-    setQueryEditorState('hidden');
+  const handlePlanCancel = () => {
+    setPlanEditorState('hidden');
     setIsLoading(false);
-    setCurrentRunId(null);
-    setPendingQueries([]);
-    setApprovedQueries([]);
+    setPendingPlan(null);
+    setApprovedPlan(null);
     setMessages(prev => [...prev, { text: 'İşlem kullanıcı tarafından iptal edildi.', sender: 'agent', isComplete: true }]);
     setCurrentStage({ stage: 'init', progress: 0, message: 'İptal edildi.' });
   };
@@ -223,28 +331,37 @@ function App() {
         </div>
         
         <div className="messages">
-          {messages.map((msg, index) => (
-            <div key={index} className={`message ${msg.sender}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-            </div>
-          ))}
+          {messages.map((msg, index) => {
+            // Son kullanıcı mesajını bul
+            const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
+            const isLastUserMessage = msg.sender === 'user' && index === lastUserMessageIndex;
+            
+            return (
+              <div key={index}>
+                <div className={`message ${msg.sender}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                </div>
+                
+                {/* Son kullanıcı mesajından sonra onaylanan planı göster */}
+                {isLastUserMessage && planEditorState === 'approved' && (
+                  <PlanEditor
+                    plan={approvedPlan}
+                    onConfirm={() => {}}
+                    onCancel={() => {}}
+                    isReadonly={true}
+                  />
+                )}
+              </div>
+            );
+          })}
 
-          {/* Query Editor - editing veya approved modda gösteriliyor */}
-          {queryEditorState === 'editing' && (
-            <EmbeddedQueryEditor
-              queries={pendingQueries}
-              onConfirm={handleQueryConfirmation}
-              onCancel={handleQueryCancel}
+          {/* Plan Editor - sadece editing modda gösteriliyor */}
+          {planEditorState === 'editing' && (
+            <PlanEditor
+              plan={pendingPlan}
+              onConfirm={handlePlanConfirmation}
+              onCancel={handlePlanCancel}
               isReadonly={false}
-            />
-          )}
-          
-          {queryEditorState === 'approved' && (
-            <EmbeddedQueryEditor
-              queries={approvedQueries}
-              onConfirm={() => {}}
-              onCancel={() => {}}
-              isReadonly={true}
             />
           )}
 
@@ -265,11 +382,11 @@ function App() {
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="kullanıcı input chat box"
-            disabled={isLoading || queryEditorState === 'editing'}
+            disabled={isLoading || planEditorState === 'editing'}
           />
           <button 
             onClick={sendMessage} 
-            disabled={isLoading || queryEditorState === 'editing'}
+            disabled={isLoading || planEditorState === 'editing'}
           >
             Gönder
           </button>
