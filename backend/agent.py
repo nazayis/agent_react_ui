@@ -1,5 +1,4 @@
 # agent.py
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import asyncio
@@ -103,12 +102,9 @@ def generate_plan_endpoint():
                 "Planı şu yapıda oluştur:",
                 "1. ARAŞTIRMA_AŞAMASI: Pazar araştırması için 5-7 spesifik Google arama sorgusu oluştur",
                 "2. ANALİZ_AŞAMASI: Toplanan verilerden hangi yönlerin analiz edileceğini tanımla",
-                "3. ÇIKTI_AŞAMASI: Son teslimerin türü ve formatını belirle",
-                "",
                 "Yanıtını şu anahtarları içeren JSON yapısı olarak formatla:",
                 "- research_queries: arama sorgusu dizileri",
                 "- analysis_focus: analiz noktaları dizisi",
-                "",
                 "Planı kapsamlı ama uygulanabilir yap. İş zekası toplamaya odaklan.",
                 "SADECE JSON yapısı ile yanıtla, ek metin ekleme."
             ],
@@ -203,7 +199,7 @@ def execute_plan_endpoint():
             # 2. İçerik Okuma Ajanı  
             reader = Agent(
                 name="İçerik Okuyucu",
-                model=OpenAIChat(id="gpt-5-nano"),
+                model=OpenAIChat(id="gpt-4o-mini"),
                 tools=[read_articles],
                 instructions=[
                     "Sen bir İçerik Okuyucusun. Verilen URL'lerdeki içerikleri okur ve özetlersin.",
@@ -246,8 +242,8 @@ def execute_plan_endpoint():
                     "- Araştırma aşamasında öğrenilen kritik bilgiler",
                     "- Pazar eksiklikleri ve fırsatlar",
                     "",
-                    "2. DOSYA: 'output/roadmap.xlsx'", 
-                    "İÇERİK (CSV formatında kaydet):",
+                    "2. DOSYA: 'output/roadmap.md'", 
+                    "İÇERİK (.md formatında kaydet, bu dosya içerisinde tablo oluştur):",
                     "- Hafta bazında görev planı",
                     "- Development aşamaları (Planning, Design, Development, Testing, Launch)",
                     "- Her görevin hangi aşamaya ait olduğu",
@@ -261,16 +257,15 @@ def execute_plan_endpoint():
                     "- ANALİZ BULGULARI", 
                     "- KARAR VERİ SÜRECİ",
                     "- STRATEJİK KARARLAR",
-                    "- HEDEFLENEn SONUÇLAR",
+                    "- HEDEFLENEN SONUÇLAR",
                     "- UYGULAMA PLANI",
                     "- ZAMAN ÇİZELGESİ",
                     "- RİSK ANALİZİ",
-                    "- KAYNAK İHTİYAÇLARI",
                     "",
                     "KURALLAR:",
-                    "- Üç dosyayı da sırasıyla oluştur ve kaydet",
+                    "- Üç dosyayı da (Türkçe) sırasıyla oluştur ve kaydet",
                     "- Her dosya detaylı ve kapsamlı olmalı",
-                    "- Roadmap dosyasını CSV formatında kaydet (.xlsx uzantısı ile)",
+                    "- Roadmap dosyasının içeriğini tablo formatında oluştur, .md olarak kaydet",
                     "- İzin isteme, onay bekleme",
                     "",
                     "YASAK: İzin isteme, öneri yapma, seçenek sunma.",
@@ -295,7 +290,7 @@ def execute_plan_endpoint():
                 "[pain_points.md içeriği]",
                 "",
                 "=== ROADMAP ===", 
-                "[roadmap.xlsx içeriği]",
+                "[roadmap.md içeriği]",
                 "",
                 "=== BUSINESS STRATEGY ===",
                 "[business_strategy.md içeriği]",
@@ -319,6 +314,7 @@ def execute_plan_endpoint():
                 instructions=team_instructions,
                 add_datetime_to_instructions=True,
                 enable_agentic_context=True,
+                share_member_interactions=True,
                 markdown=True,
                 debug_mode=True
             )
@@ -333,7 +329,7 @@ ARAŞTIRMA SORGULARİ:
 ANALİZ ODAKLARI:
 {chr(10).join(f"- {focus}" for focus in sanitized_plan.get('analysis_focus', []))}
 
-ÇIKTI FORMATI: 3 dosya (pain_points.md, roadmap.xlsx, business_strategy.md)
+ÇIKTI FORMATI: 3 dosya (pain_points.md, roadmap.md, business_strategy.md)
 """
 
             response = await analysis_team.arun(f"Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:\n{plan_text}")
