@@ -409,84 +409,103 @@ function App() {
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
+  // Kullanıcı mesajlarının genişliğini uzunluğa göre dinamik ayarla
+  const computeUserMessageMaxWidth = (text) => {
+    const normalizedLength = (text || '').replace(/\s+/g, ' ').trim().length;
+    if (normalizedLength <= 40) return '70%';
+    if (normalizedLength <= 120) return '60%';
+    if (normalizedLength <= 240) return '50%';
+    return '45%';
+  };
+
   return (
     <div className="app-container">
-      <button className="hamburger-button" onClick={toggleSidebar}>
-        <div className="hamburger-icon"><span></span><span></span><span></span></div>
-      </button>
-
       <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
          {/* Sidebar içeriği */}
       </div>
 
+      {/* Sidebar açıkken görünen arkaplan - tıklanınca kapatır */}
+      <div
+        className={`backdrop ${isSidebarOpen ? 'visible' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+      />
+
       <div className="chat-container">
         <div className="header">
-          <p>aşağıdaki alana ihtiyaç analiz için isteğini detaylandır</p>
-        </div>
-        
-        <div className="messages">
-          {messages.map((msg, index) => {
-            // Son kullanıcı mesajını bul
-            const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
-            const isLastUserMessage = msg.sender === 'user' && index === lastUserMessageIndex;
-            
-            return (
-              <div key={index}>
-                <div className={`message ${msg.sender}`}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-                </div>
-                
-                {/* Son kullanıcı mesajından sonra onaylanan planı göster */}
-                {isLastUserMessage && planEditorState === 'approved' && (
-                  <PlanEditor
-                    plan={approvedPlan}
-                    onConfirm={() => {}}
-                    onCancel={() => {}}
-                    isReadonly={true}
-                  />
-                )}
-              </div>
-            );
-          })}
-
-          {/* Plan Editor - sadece editing modda gösteriliyor */}
-          {planEditorState === 'editing' && (
-            <PlanEditor
-              plan={pendingPlan}
-              onConfirm={handlePlanConfirmation}
-              onCancel={handlePlanCancel}
-              isReadonly={false}
-            />
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div className="input-area">
-          {isLoading && (
-            <ProgressIndicator 
-              stage={currentStage.stage}
-              progress={currentStage.progress}
-              message={currentStage.message}
-            />
-          )}
-          <div className="input-row">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              placeholder="kullanıcı input chat box"
-              disabled={isLoading || planEditorState === 'editing'}
-            />
-            <button 
-              onClick={sendMessage} 
-              disabled={isLoading || planEditorState === 'editing'}
-              className="send-button"
-              aria-label="Gönder"
-            >
-              <img src={sendIcon} alt="Send" className="send-icon" />
+          <div className="header-left">
+            <button className="hamburger-button" onClick={toggleSidebar}>
+              <div className="hamburger-icon"><span></span><span></span><span></span></div>
             </button>
+            <div className="header-title">İhtiyaç Analizi Asistanı</div>
+          </div>
+          <div className="header-right"></div>
+        </div>
+
+        <div className="main-container">
+          <div className="messages">
+            {messages.map((msg, index) => {
+              // Son kullanıcı mesajını bul
+              const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
+              const isLastUserMessage = msg.sender === 'user' && index === lastUserMessageIndex;
+              
+              return (
+                <div key={index}>
+                  <div className={`message ${msg.sender}`} style={msg.sender === 'user' ? { maxWidth: computeUserMessageMaxWidth(msg.text) } : undefined}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                  </div>
+                  
+                  {/* Son kullanıcı mesajından sonra onaylanan planı göster */}
+                  {isLastUserMessage && planEditorState === 'approved' && (
+                    <PlanEditor
+                      plan={approvedPlan}
+                      onConfirm={() => {}}
+                      onCancel={() => {}}
+                      isReadonly={true}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {/* Plan Editor - sadece editing modda gösteriliyor */}
+            {planEditorState === 'editing' && (
+              <PlanEditor
+                plan={pendingPlan}
+                onConfirm={handlePlanConfirmation}
+                onCancel={handlePlanCancel}
+                isReadonly={false}
+              />
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="input-area">
+            {isLoading && (
+              <ProgressIndicator 
+                stage={currentStage.stage}
+                progress={currentStage.progress}
+                message={currentStage.message}
+              />
+            )}
+            <div className="input-row">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="kullanıcı input chat box"
+                disabled={isLoading || planEditorState === 'editing'}
+              />
+              <button 
+                onClick={sendMessage} 
+                disabled={isLoading || planEditorState === 'editing'}
+                className="send-button"
+                aria-label="Gönder"
+              >
+                <img src={sendIcon} alt="Send" className="send-icon" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
