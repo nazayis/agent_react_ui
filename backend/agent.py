@@ -5,6 +5,7 @@ import asyncio
 import uuid
 from pathlib import Path
 from textwrap import dedent
+import datetime
 
 # Web scraping imports
 import requests
@@ -21,6 +22,8 @@ try:
     from agno.tools import tool
     from agno.tools.user_control_flow import UserControlFlowTools
     from dotenv import load_dotenv
+    from agno.knowledge.markdown import MarkdownKnowledgeBase
+    from agno.vectordb.lancedb import LanceDb
 except ImportError as e:
     print(f"Hata: Gerekli kütüphanelerden biri eksik: {e}")
     exit(1)
@@ -31,8 +34,17 @@ CORS(app)
 load_dotenv()
 OUTPUT_DIR = Path(__file__).parent / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+KB_DIR = Path(__file__).parent / "kb"
+KB_DIR.mkdir(exist_ok=True)
+LANCEDB_URI = OUTPUT_DIR / "vector_db"
+knowledge_vector_db = LanceDb(table_name="markdown_kb", uri=LANCEDB_URI)
+knowledge_base = MarkdownKnowledgeBase(path=KB_DIR, vector_db=knowledge_vector_db)
+# İlk indeksleme için bir kez True, sonra False kullanın
+try:
+	knowledge_base.load(recreate=False)
+except Exception as e:
+	print(f"Knowledge base load error: {e}")
 
-# --- Global State ---
 pending_runs = {}
 
 # --- Custom Tool: read_articles ---
@@ -44,19 +56,19 @@ def read_articles(urls: list[str]) -> str:
         try:
             response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
             response.raise_for_status()
-            
+                        
             # Encoding'i düzgün handle et
             if response.encoding is None:
-                response.encoding = 'utf-8'
-            
+                response.encoding = getattr(response, "apparent_encoding", None) or 'utf-8'
+
             # BeautifulSoup'a düzgün encoded text ver
             try:
                 # Önce response.text kullanmayı dene (otomatik encoding)
                 soup = BeautifulSoup(response.text, 'html.parser')
             except UnicodeDecodeError:
-                # Eğer hata olursa utf-8 ile zorla
-                soup = BeautifulSoup(response.content.decode('utf-8', errors='ignore'), 'html.parser')
-            
+                enc = getattr(response, "apparent_encoding", None) or 'utf-8'
+                soup = BeautifulSoup(response.content.decode(enc, errors='replace'), 'html.parser')
+                
             # Sadece ana içerik alanlarını al
             # Scripttleri, style'ları ve navigation'ları kaldır
             for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
@@ -93,15 +105,16 @@ def generate_plan_endpoint():
     session_id = str(uuid.uuid4())
 
     async def _run():
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         planning_agent = Agent(
             model=OpenAIChat(id="gpt-5-nano"),
             tools=[],  # Planning agent doesn't need external tools
             instructions=[
-                "Sen iş araştırması ve teklif oluşturma için Stratejik Planlama Ajanısın.",
+                f"Sen iş araştırması ve teklif oluşturma için Stratejik Planlama Ajanısın. Bugünün tarihi: {today}",
                 "Görevin kullanıcının isteğine dayalı olarak detaylı, yapılandırılmış bir eylem planı oluşturmaktır.",
                 "Planı şu yapıda oluştur:",
-                "1. ARAŞTIRMA_AŞAMASI: Pazar araştırması için 5-7 spesifik Google arama sorgusu oluştur",
-                "2. ANALİZ_AŞAMASI: Toplanan verilerden hangi yönlerin analiz edileceğini tanımla",
+                "1. ARAŞTIRMA_AŞAMASI: Pazar araştırması için 3-4 spesifik Google arama sorgusu oluştur",
+                "2. ANALİZ_AŞAMASI: Toplanan verilerden hangi yönlerin analiz edileceğini tanımla. Toplam 3 analiz noktası olmalı. Her analiz noktası 5-6 kelimelik ve temel olmalı.",
                 "Yanıtını şu anahtarları içeren JSON yapısı olarak formatla:",
                 "- research_queries: arama sorgusu dizileri",
                 "- analysis_focus: analiz noktaları dizisi",
@@ -109,6 +122,7 @@ def generate_plan_endpoint():
                 "SADECE JSON yapısı ile yanıtla, ek metin ekleme."
             ],
             session_id=session_id,
+            knowledge=knowledge_base,
             debug_mode=True
         )
 
@@ -137,7 +151,7 @@ def generate_plan_endpoint():
                 'session_id': session_id,
                 'message': 'Plan generated. Please structure the plan data manually.'
             })
-
+        
     return asyncio.run(_run())
 
 # Phase 2: Execution Agent - Executes the approved plan without human intervention
@@ -170,9 +184,22 @@ def execute_plan_endpoint():
                 if t:
                     focuses.append(t)
 
+    # Sanitize output files: prefer output_format (string with newlines) from frontend
+    default_files = ['pain_points.md', 'roadmap.md', 'business_strategy.md']
+    raw_output_format = plan.get('output_format') if isinstance(plan, dict) else None
+    files = []
+    if isinstance(raw_output_format, str):
+        files = [s.strip() for s in raw_output_format.split('\n') if s and s.strip()]
+    # Ensure exactly three filenames
+    if not files:
+        files = default_files
+    else:
+        files = (files + default_files)[:3]
+
     sanitized_plan = {
         'research_queries': queries,
-        'analysis_focus': focuses
+        'analysis_focus': focuses,
+        'output_files': files
     }
     
     session_id = str(uuid.uuid4())
@@ -185,8 +212,10 @@ def execute_plan_endpoint():
                 name="Araştırmacı",
                 model=OpenAIChat(id="gpt-5-nano"),
                 tools=[GoogleSearchTools()],
+                knowledge=knowledge_base,
                 instructions=[
                     "Sen bir Araştırmacısın. Verilen arama sorgularını çalıştırıp URL'leri toplarsın.",
+                    "FRAGMAN: Her sorgu için ÖNCE bilgi tabanında (KB) arama yap; ilgili bulguları kısa maddelerle özetle ve kaynak dosya adlarını belirt. Ardından Google araması yap.",
                     "Frontend'de onaylanan arama sorgularını esas alarak en etkin arama sorgularını oluştur",
                     "Toplam arama sorgusu 5'i GEÇMEMELİ. 5'ten fazlaysa en alakalı 5'ini seç ve yalnızca onlar için sonuç topla.",
                     "Her sorgu için en alakalı 3 URL bul ve listele.",
@@ -204,7 +233,7 @@ def execute_plan_endpoint():
                 instructions=[
                     "Sen bir İçerik Okuyucusun. Verilen URL'lerdeki içerikleri okur ve özetlersin.",
                     "Her URL'yi ayrı ayrı oku ve içeriği özetle.",
-                    "YASAK: Yorum yapma, öneri sunma, izin isteme.",
+                    "YASAK: Öneri sunma, izin isteme.",
                 ],
                 markdown=True,
                 debug_mode=True
@@ -225,51 +254,59 @@ def execute_plan_endpoint():
             )
             
             # 4. İş Planı ve Strateji Uzmanı
+            file1, file2, file3 = sanitized_plan['output_files']
+            proposer_instructions = [
+                "Sen bir İş Stratejistisisin. Analiz sonuçlarından 3 ayrı dosya hazırlarsın.",
+                "",
+                "GÖREV: Şu 3 dosyayı sırasıyla oluştur:",
+                "",
+                f"1. DOSYA: 'output/{file1}'",
+                "Default içerik pain_points.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
+                "pain_points.md"
+                "- Proje fikrinin acı noktaları",
+                "- Competitor'ların yaptıkları analizi",
+                "- Bu sorunların üstesinden gelme yöntemleri",
+                "- Araştırma aşamasında öğrenilen kritik bilgiler",
+                "- Pazar eksiklikleri ve fırsatlar",
+                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
+                "",
+                f"2. DOSYA: 'output/{file2}'",
+                "Default içerik roadmap.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
+                "İÇERİK (.md formatında kaydet, bu dosya içerisinde tablo oluştur):",
+                "- Hafta bazında görev planı",
+                "- Development aşamaları (Planning, Design, Development, Testing, Launch)",
+                "- Her görevin hangi aşamaya ait olduğu",
+                "- Sorumlu kişi/ekip bilgisi",
+                "- Başlangıç ve bitiş tarihleri",
+                "- Öncelik seviyeleri",
+                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
+                "",
+                f"3. DOSYA: 'output/{file3}'",
+                "Default içerik business_strategy.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
+                "business_strategy.md"
+                "İÇERİK (9 ana bölüm):",
+                "- YÖNETİCİ ÖZETİ",
+                "- ANALİZ BULGULARI", 
+                "- KARAR VERİ SÜRECİ",
+                "- STRATEJİK KARARLAR",
+                "- HEDEFLENEN SONUÇLAR",
+                "- UYGULAMA PLANI",
+                "- ZAMAN ÇİZELGESİ",
+                "- RİSK ANALİZİ",
+                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
+                "",
+                "KURALLAR:",
+                "- Üç dosyayı da (Türkçe) sırasıyla oluştur ve kaydet",
+                "- Her dosya detaylı ve kapsamlı olmalı",
+                "- Roadmap dosyasının içeriğini tablo formatında oluştur, .md olarak kaydet",
+                "- İzin isteme, onay bekleme",
+                "",
+            ]
             proposer = Agent(
                 name="İş Planı Uzmanı",
                 model=OpenAIChat(id="gpt-5-nano"),
                 tools=[fs_tools],
-                instructions=[
-                    "Sen bir İş Stratejistisisin. Analiz sonuçlarından 3 ayrı dosya hazırlarsın.",
-                    "",
-                    "GÖREV: Şu 3 dosyayı sırasıyla oluştur:",
-                    "",
-                    "1. DOSYA: 'output/pain_points.md'",
-                    "İÇERİK:",
-                    "- Proje fikrinin acı noktaları",
-                    "- Competitor'ların yaptıkları analizi",
-                    "- Bu sorunların üstesinden gelme yöntemleri",
-                    "- Araştırma aşamasında öğrenilen kritik bilgiler",
-                    "- Pazar eksiklikleri ve fırsatlar",
-                    "",
-                    "2. DOSYA: 'output/roadmap.md'", 
-                    "İÇERİK (.md formatında kaydet, bu dosya içerisinde tablo oluştur):",
-                    "- Hafta bazında görev planı",
-                    "- Development aşamaları (Planning, Design, Development, Testing, Launch)",
-                    "- Her görevin hangi aşamaya ait olduğu",
-                    "- Sorumlu kişi/ekip bilgisi",
-                    "- Başlangıç ve bitiş tarihleri",
-                    "- Öncelik seviyeleri",
-                    "",
-                    "3. DOSYA: 'output/business_strategy.md'",
-                    "İÇERİK (9 ana bölüm):",
-                    "- YÖNETİCİ ÖZETİ",
-                    "- ANALİZ BULGULARI", 
-                    "- KARAR VERİ SÜRECİ",
-                    "- STRATEJİK KARARLAR",
-                    "- HEDEFLENEN SONUÇLAR",
-                    "- UYGULAMA PLANI",
-                    "- ZAMAN ÇİZELGESİ",
-                    "- RİSK ANALİZİ",
-                    "",
-                    "KURALLAR:",
-                    "- Üç dosyayı da (Türkçe) sırasıyla oluştur ve kaydet",
-                    "- Her dosya detaylı ve kapsamlı olmalı",
-                    "- Roadmap dosyasının içeriğini tablo formatında oluştur, .md olarak kaydet",
-                    "- İzin isteme, onay bekleme",
-                    "",
-                    "YASAK: İzin isteme, öneri yapma, seçenek sunma.",
-                ],
+                instructions=proposer_instructions,
                 markdown=True,
                 debug_mode=True
             )
@@ -278,26 +315,24 @@ def execute_plan_endpoint():
             team_instructions = [
                 "Sen bir Proje Koordinatörüsün. Takımı yönetir ve görevleri sırayla dağıtırsın.",
                 "",
-                "GÖREV: Şu adımları takip et:",
-                "1. Araştırmacı'ya arama sorgularını ver",
+                "Eğer kullanıcı yeni bir projeye başlamak istiyorsa şu adımları takip et:",
+                "0. Her arama sorgusu için ÖNCE bilgi tabanında (KB) ilgili içerik var mı diye ara ve bulguları not et; ardından web araması yap.",
+                "1. Araştırmacı'ya arama sorgularını ver. Her arama sorgusu için en alakalı 3 URL bulmalı.",
                 "2. İçerik Okuyucu'ya URL'leri ver", 
                 "3. Analist'e içerikleri analiz ettir",
                 "4. İş Planı Uzmanı'na 3 dosyayı hazırlat",
                 "5. Oluşturulan 3 dosyayı oku ve özetle",
                 "",
-                "ÇIKTI: 3 dosyanın içeriğini şu format ile paylaş:",
-                "=== PAIN POINTS ===",
-                "[pain_points.md içeriği]",
-                "",
-                "=== ROADMAP ===", 
-                "[roadmap.md içeriği]",
-                "",
-                "=== BUSINESS STRATEGY ===",
-                "[business_strategy.md içeriği]",
+                "ÇIKTI: 3 dosyanın içeriğini şu dosyalardan oku ve aynen paylaş:",
+                f"- output/{file1}",
+                f"- output/{file2}",
+                f"- output/{file3}",
                 "",
                 "Her dosyayı read_file ile oku ve aynen döndür.",
                 "",
-                "YASAK: Kendi metin üretme, süreç anlatma, öneri yapma.",
+                "Kullanıcının yeni proje geliştirme talepleri dışındaki sorulara, takım dinamiklerini aklında bulundurarak kendin karar ver.",
+                "",
+                "YASAK: Kendi metin üretme, süreç anlatma, izin isteme, öneri yapma. Sadece son çıktıyı paylaş.",
             ]
 
             analysis_team = Team(
@@ -316,7 +351,9 @@ def execute_plan_endpoint():
                 enable_agentic_context=True,
                 share_member_interactions=True,
                 markdown=True,
-                debug_mode=True
+                debug_mode=True,
+                knowledge=knowledge_base,
+                search_knowledge=True,
             )
 
             # Convert plan to a readable format for the team
@@ -329,7 +366,7 @@ ARAŞTIRMA SORGULARİ:
 ANALİZ ODAKLARI:
 {chr(10).join(f"- {focus}" for focus in sanitized_plan.get('analysis_focus', []))}
 
-ÇIKTI FORMATI: 3 dosya (pain_points.md, roadmap.md, business_strategy.md)
+ÇIKTI FORMATI: 3 dosya ({', '.join(sanitized_plan.get('output_files', []))})
 """
 
             response = await analysis_team.arun(f"Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:\n{plan_text}")
@@ -340,7 +377,7 @@ ANALİZ ODAKLARI:
                 'session_id': session_id,
                 'message': 'Plan takım tarafından başarıyla uygulandı. İş stratejisi tamamlandı ve kaydedildi.'
             })
-
+            
     return asyncio.run(_run())
 
 # Legacy endpoint for backward compatibility (can be removed later)
@@ -359,3 +396,12 @@ def analyze_and_propose_endpoint():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5001)
+
+
+    """
+    ihtiyaç analizi olduğunu takım lideriyle paylaş
+        çıktı dosyasında iihtiyaç analiz dokümanı olması buna göre cevap vermesi
+    son doküman pdf md txt formatta download edilebilir olması lazım
+    sol taraftaki next step akış built in çalışmayan bir şey olur
+    arayüzün dizaynı toparlanması ()
+    """

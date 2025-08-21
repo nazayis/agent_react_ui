@@ -1,0 +1,605 @@
+DEBUG *** Agent ID: 78801ad1-e025-468b-bd57-1e1f07d45c4e **              
+DEBUG  Agent Run Start: 65cf01f0-9113-4b2a-8033-62ff27e39a67             
+DEBUG ------------ OpenAI Async Response Start ------------              
+DEBUG ----------------- Model: gpt-5-nano -----------------              
+DEBUG ======================= system ======================              
+DEBUG <instructions>                                                     
+      - Sen iş araştırması ve teklif oluşturma için Stratejik Planlama   
+      Ajanısın.                                                          
+      - Görevin kullanıcının isteğine dayalı olarak detaylı,             
+      yapılandırılmış bir eylem planı oluşturmaktır.                     
+      - Planı şu yapıda oluştur:                                         
+      - 1. ARAŞTIRMA_AŞAMASI: Pazar araştırması için 5-7 spesifik Google 
+      arama sorgusu oluştur                                              
+      - 2. ANALİZ_AŞAMASI: Toplanan verilerden hangi yönlerin analiz     
+      edileceğini tanımla                                                
+      - Yanıtını şu anahtarları içeren JSON yapısı olarak formatla:      
+      - - research_queries: arama sorgusu dizileri                       
+      - - analysis_focus: analiz noktaları dizisi                        
+      - Planı kapsamlı ama uygulanabilir yap. İş zekası toplamaya        
+      odaklan.                                                           
+      - SADECE JSON yapısı ile yanıtla, ek metin ekleme.                 
+      </instructions>                                                    
+DEBUG ======================== user =======================              
+DEBUG fibabanka'da çalışan bir kampanya sorumlusuyum. fibabanka          
+      müşterilerinin aylık işlem hacmini arttıracak bir kampanya         
+      oluşturmak istiyorum.                                              
+DEBUG ================================== assistant ==================================              
+DEBUG {                                                                                            
+        "research_queries": [                                                                      
+          "Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası",                  
+          "Türkiye bankacılık dijital kampanya performans ölçümü",                                 
+          "bankacılık cashback ödül programlarının işlem hacmi etkisi",                            
+          "mobil bankacılık kullanımını artıran kampanya tasarımı Türkiye",                        
+          "bankacılık işlem ücreti teşviklerinin ROI analizi Türkiye",                             
+          "kullanıcı davranış analizi ve işlem alışkanlıkları Türkiye bankacılık"                  
+        ],                                                                                         
+        "analysis_focus": [                                                                        
+          "Mevcut aylık işlem hacmi temel göstergeleri: kullanıcı başına aylık işlem adedi, hacim, 
+      ortalama işlem büyüklüğü",                                                                   
+          "Segment tablosu ve karlılık analizi: yeni ve mevcut müşteriler, segmentlere göre hacim  
+      ve potansiyel",                                                                              
+          "Kampanya yapısı ve hedefleri: cashback, ödül puanı veya ücret muafiyetinin ARPU ve      
+      hacime etkisi",                                                                              
+          "Kanal etkisi ve iletişim stratejisi: mobil uygulama bildirimleri, push, SMS, e-posta ve 
+      in-app mesajlarının dönüşüm etkisi",                                                         
+          "Teşvik duyarlılığı ve fatigue riskleri: farklı teşvik türlerinin etkisi ve zamanla      
+      azalma potansiyeli",                                                                         
+          "A/B test planı ve KPI'lar: inkremental işlem adedi, inc. revenue, ROI, payback dönemi ve
+      statistical significance",                                                                   
+          "Veri altyapısı ve kalite güvencesi: CRM, core banking, data warehouse entegrasyonu, veri
+      hijyeni ve güvenlik/loglama"                                                                 
+        ]                                                                                          
+      }                                                                                            
+DEBUG **********************************  METRICS  **********************************              
+DEBUG * Tokens:                      input=249, output=2541, total=2790, reasoning=2176            
+DEBUG * Prompt tokens details:       {'audio_tokens': 0, 'cached_tokens': 0}                       
+DEBUG * Completion tokens details:   {'accepted_prediction_tokens': 0, 'audio_tokens': 0,          
+      'reasoning_tokens': 2176, 'rejected_prediction_tokens': 0}                                   
+DEBUG * Time:                        13.8104s                                                      
+DEBUG * Tokens per second:           183.9919 tokens/s                                             
+DEBUG **********************************  METRICS  **********************************              
+DEBUG -------------------------- OpenAI Async Response End --------------------------              
+DEBUG Added RunResponse to Memory                                                                  
+DEBUG ************* Agent Run End: 65cf01f0-9113-4b2a-8033-62ff27e39a67 *************              
+127.0.0.1 - - [21/Aug/2025 09:25:28] "POST /generate-plan HTTP/1.1" 200 -
+127.0.0.1 - - [21/Aug/2025 09:25:48] "OPTIONS /execute-plan HTTP/1.1" 200 -
+Secure MCP Filesystem Server running on stdio
+Client does not support MCP Roots, using allowed directories set from server args: [ '/Users/ebrunazayis/Desktop/fiba/react_agent_ui/backend/output' ]
+DEBUG Function: read_file registered with MCPTools                                                 
+DEBUG Function: read_text_file registered with MCPTools                                            
+DEBUG Function: read_media_file registered with MCPTools                                           
+DEBUG Function: read_multiple_files registered with MCPTools                                       
+DEBUG Function: write_file registered with MCPTools                                                
+DEBUG Function: edit_file registered with MCPTools                                                 
+DEBUG Function: create_directory registered with MCPTools                                          
+DEBUG Function: list_directory registered with MCPTools                                            
+DEBUG Function: list_directory_with_sizes registered with MCPTools                                 
+DEBUG Function: directory_tree registered with MCPTools                                            
+DEBUG Function: move_file registered with MCPTools                                                 
+DEBUG Function: search_files registered with MCPTools                                              
+DEBUG Function: get_file_info registered with MCPTools                                             
+DEBUG Function: list_allowed_directories registered with MCPTools                                  
+DEBUG MCPTools initialized with 14 tools                                                           
+DEBUG Function: google_search registered with google_search_tools                                  
+DEBUG *************** Session ID: 53e48556-c0dc-4c4b-9a6d-7465c5c1b921 **************              
+DEBUG **************** Team ID: 36831e0b-be41-4b64-a9bd-5ec668cce280 ****************              
+DEBUG Processing tools for model                                                                   
+DEBUG Added tool read_file from MCPTools                                                           
+DEBUG Added tool read_text_file from MCPTools                                                      
+DEBUG Added tool read_media_file from MCPTools                                                     
+DEBUG Added tool read_multiple_files from MCPTools                                                 
+DEBUG Added tool write_file from MCPTools                                                          
+DEBUG Added tool edit_file from MCPTools                                                           
+DEBUG Added tool create_directory from MCPTools                                                    
+DEBUG Added tool list_directory from MCPTools                                                      
+DEBUG Added tool list_directory_with_sizes from MCPTools                                           
+DEBUG Added tool directory_tree from MCPTools                                                      
+DEBUG Added tool move_file from MCPTools                                                           
+DEBUG Added tool search_files from MCPTools                                                        
+DEBUG Added tool get_file_info from MCPTools                                                       
+DEBUG Added tool list_allowed_directories from MCPTools                                            
+DEBUG Added tool set_shared_context                                                                
+DEBUG Added tool transfer_task_to_member                                                           
+DEBUG ************* Team Run Start: 03616902-79f1-43f2-ab6e-b51e7bd94294 ************              
+DEBUG ****************************** Mode: 'coordinate' *****************************              
+DEBUG ------------------------- OpenAI Async Response Start -------------------------              
+DEBUG ------------------------------ Model: gpt-5-nano ------------------------------              
+DEBUG ==================================== system ===================================              
+DEBUG You are the leader of a team and sub-teams of AI Agents.                                     
+      Your task is to coordinate the team to complete the user's request.                          
+                                                                                                   
+      Here are the members in your team:                                                           
+      <team_members>                                                                               
+       - Agent 1:                                                                                  
+         - ID: araştırmacı                                                                         
+         - Name: Araştırmacı                                                                       
+         - Member tools:                                                                           
+          - google_search                                                                          
+       - Agent 2:                                                                                  
+         - ID: içerik-okuyucu                                                                      
+         - Name: İçerik Okuyucu                                                                    
+         - Member tools:                                                                           
+          - read_articles                                                                          
+       - Agent 3:                                                                                  
+         - ID: analist                                                                             
+         - Name: Analist                                                                           
+         - Member tools:                                                                           
+       - Agent 4:                                                                                  
+         - ID: iş-planı-uzmanı                                                                     
+         - Name: İş Planı Uzmanı                                                                   
+         - Member tools:                                                                           
+          - read_file                                                                              
+          - read_text_file                                                                         
+          - read_media_file                                                                        
+          - read_multiple_files                                                                    
+          - write_file                                                                             
+          - edit_file                                                                              
+          - create_directory                                                                       
+          - list_directory                                                                         
+          - list_directory_with_sizes                                                              
+          - directory_tree                                                                         
+          - move_file                                                                              
+          - search_files                                                                           
+          - get_file_info                                                                          
+          - list_allowed_directories                                                               
+      </team_members>                                                                              
+                                                                                                   
+      <how_to_respond>                                                                             
+      - You can either respond directly or transfer tasks to members in your team with the highest 
+      likelihood of completing the user's request.                                                 
+      - Carefully analyze the tools available to the members and their roles before transferring   
+      tasks.                                                                                       
+      - You cannot use a member tool directly. You can only transfer tasks to members.             
+      - When you transfer a task to another member, make sure to include:                          
+        - member_id (str): The ID of the member to transfer the task to. Use only the ID of the    
+      member, not the ID of the team followed by the ID of the member.                             
+        - task_description (str): A clear description of the task.                                 
+        - expected_output (str): The expected output.                                              
+      - You can transfer tasks to multiple members at once.                                        
+      - You must always analyze the responses from members before responding to the user.          
+      - After analyzing the responses from the members, if you feel the task has been completed,   
+      you can stop and respond to the user.                                                        
+      - If you are not satisfied with the responses from the members, you should re-assign the     
+      task.                                                                                        
+      </how_to_respond>                                                                            
+                                                                                                   
+      <shared_context>                                                                             
+      You have access to a shared context that will be shared with all members of the team.        
+      Use this shared context to improve inter-agent communication and coordination.               
+      It is important that you update the shared context as often as possible.                     
+      To update the shared context, use the `set_shared_context` tool.                             
+      </shared_context>                                                                            
+                                                                                                   
+      Your name is: İş Strateji Takımı                                                             
+                                                                                                   
+      <description>                                                                                
+      Sen bir Proje Koordinatörüsün. Takımı yönetir ve verilen planı uygularsın.                   
+      </description>                                                                               
+                                                                                                   
+      <instructions>                                                                               
+      - Sen bir Proje Koordinatörüsün. Takımı yönetir ve görevleri sırayla dağıtırsın.             
+      -                                                                                            
+      - GÖREV: Şu adımları takip et:                                                               
+      - 1. Araştırmacı'ya arama sorgularını ver                                                    
+      - 2. İçerik Okuyucu'ya URL'leri ver                                                          
+      - 3. Analist'e içerikleri analiz ettir                                                       
+      - 4. İş Planı Uzmanı'na 3 dosyayı hazırlat                                                   
+      - 5. Oluşturulan 3 dosyayı oku ve özetle                                                     
+      -                                                                                            
+      - ÇIKTI: 3 dosyanın içeriğini şu format ile paylaş:                                          
+      - === PAIN POINTS ===                                                                        
+      - [pain_points.md içeriği]                                                                   
+      -                                                                                            
+      - === ROADMAP ===                                                                            
+      - [roadmap.md içeriği]                                                                       
+      -                                                                                            
+      - === BUSINESS STRATEGY ===                                                                  
+      - [business_strategy.md içeriği]                                                             
+      -                                                                                            
+      - Her dosyayı read_file ile oku ve aynen döndür.                                             
+      -                                                                                            
+      - YASAK: Kendi metin üretme, süreç anlatma, öneri yapma.                                     
+      </instructions>                                                                              
+                                                                                                   
+      <additional_information>                                                                     
+      - Use markdown to format your answers.                                                       
+      - The current time is 2025-08-21 09:25:50.252151                                             
+      </additional_information>                                                                    
+DEBUG ===================================== user ====================================              
+DEBUG Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:                            
+                                                                                                   
+      UYGULAMA PLANI:                                                                              
+                                                                                                   
+      ARAŞTIRMA SORGULARİ:                                                                         
+      - Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası                       
+      - Türkiye bankacılık dijital kampanya performans ölçümü                                      
+                                                                                                   
+      ANALİZ ODAKLARI:                                                                             
+      - Mevcut aylık işlem hacmi temel göstergeleri: kullanıcı başına aylık işlem adedi, hacim,    
+      ortalama işlem büyüklüğü                                                                     
+      - Segment tablosu ve karlılık analizi: yeni ve mevcut müşteriler, segmentlere göre hacim ve  
+      potansiyel                                                                                   
+      - Kampanya yapısı ve hedefleri: cashback, ödül puanı veya ücret muafiyetinin ARPU ve hacime  
+      etkisi                                                                                       
+      - Kanal etkisi ve iletişim stratejisi: mobil uygulama bildirimleri, push, SMS, e-posta ve    
+      in-app mesajlarının dönüşüm etkisi                                                           
+      - Teşvik duyarlılığı ve fatigue riskleri: farklı teşvik türlerinin etkisi ve zamanla azalma  
+      potansiyeli                                                                                  
+      - A/B test planı ve KPI'lar: inkremental işlem adedi, inc. revenue, ROI, payback dönemi ve   
+      statistical significance                                                                     
+      - Veri altyapısı ve kalite güvencesi: CRM, core banking, data warehouse entegrasyonu, veri   
+      hijyeni ve güvenlik/loglama                                                                  
+                                                                                                   
+      ÇIKTI FORMATI: 3 dosya (pain_points.md, roadmap.md, business_strategy.md)                    
+                                                                                                   
+DEBUG ================================== assistant ==================================              
+DEBUG Tool Calls:                                                                                  
+        - ID: 'call_yUXM5IjKHkjw5mU6B30fpBbe'                                                      
+          Name: 'transfer_task_to_member'                                                          
+          Arguments: 'member_id: araştırmacı, task_description: İki araştırma sorgusunu yürüt: 1)  
+      Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası; 2) Türkiye bankacılık  
+      dijital kampanya performans ölçümü. Her sorgu için güvenilir kaynaklardan en az 5-7 URL topla
+      ve her kaynağı kısa bir özetle birlikte sun., expected_output: Sorgu sonuçları ve elde edilen
+      kaynakların URL listesi (iki sorgu için toplamda en az 10-14 kaynak), her kaynak için 1-2    
+      cümlelik özet.'                                                                              
+DEBUG **********************************  METRICS  **********************************              
+DEBUG * Tokens:                      input=2524, output=1436, total=3960, reasoning=1280           
+DEBUG * Prompt tokens details:       {'audio_tokens': 0, 'cached_tokens': 0}                       
+DEBUG * Completion tokens details:   {'accepted_prediction_tokens': 0, 'audio_tokens': 0,          
+      'reasoning_tokens': 1280, 'rejected_prediction_tokens': 0}                                   
+DEBUG * Time:                        9.1072s                                                       
+DEBUG * Tokens per second:           157.6776 tokens/s                                             
+DEBUG **********************************  METRICS  **********************************              
+DEBUG Running: transfer_task_to_member(member_id=araştırmacı, task_description=...,                
+      expected_output=...)                                                                         
+DEBUG *************** Session ID: 53e48556-c0dc-4c4b-9a6d-7465c5c1b921 **************              
+DEBUG **************** Agent ID: 7964e6dc-1b0a-4a30-9ab5-89c4f166761a ***************              
+DEBUG Processing tools for model                                                                   
+DEBUG Added tool google_search from google_search_tools                                            
+DEBUG ************ Agent Run Start: d45163e0-c46f-4eb1-8036-ae9a16175669 ************              
+DEBUG ------------------------- OpenAI Async Response Start -------------------------              
+DEBUG ------------------------------ Model: gpt-5-nano ------------------------------              
+DEBUG ==================================== system ===================================              
+DEBUG <instructions>                                                                               
+      - Sen bir Araştırmacısın. Verilen arama sorgularını çalıştırıp URL'leri toplarsın.           
+      - Frontend'de onaylanan arama sorgularını esas alarak en etkin arama sorgularını oluştur     
+      - Toplam arama sorgusu 5'i GEÇMEMELİ. 5'ten fazlaysa en alakalı 5'ini seç ve yalnızca onlar  
+      için sonuç topla.                                                                            
+      - Her sorgu için en alakalı 3 URL bul ve listele.                                            
+      - YASAK: Öneri yapma, izin isteme, yorum ekleme.                                             
+      </instructions>                                                                              
+                                                                                                   
+      <additional_information>                                                                     
+      - Use markdown to format your answers.                                                       
+      </additional_information>                                                                    
+DEBUG ===================================== user ====================================              
+DEBUG You are a member of a team of agents. Your goal is to complete the following task:           
+                                                                                                   
+      <task>                                                                                       
+      İki araştırma sorgusunu yürüt: 1) Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma  
+      kampanyası; 2) Türkiye bankacılık dijital kampanya performans ölçümü. Her sorgu için         
+      güvenilir kaynaklardan en az 5-7 URL topla ve her kaynağı kısa bir özetle birlikte sun.      
+      </task>                                                                                      
+                                                                                                   
+      <expected_output>                                                                            
+      Sorgu sonuçları ve elde edilen kaynakların URL listesi (iki sorgu için toplamda en az 10-14  
+      kaynak), her kaynak için 1-2 cümlelik özet.                                                  
+      </expected_output>                                                                           
+DEBUG ================================== assistant ==================================              
+DEBUG Tool Calls:                                                                                  
+        - ID: 'call_1z458XSZpcBKWMU6dqv8DNLA'                                                      
+          Name: 'google_search'                                                                    
+          Arguments: 'query: Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası, 
+      max_results: 5, language: tr'                                                                
+        - ID: 'call_Cs9YZaQVMuEgEeIIOjrEB3V1'                                                      
+          Name: 'google_search'                                                                    
+          Arguments: 'query: Türkiye bankacılık dijital kampanya performans ölçümü, max_results: 5,
+      language: tr'                                                                                
+DEBUG **********************************  METRICS  **********************************              
+DEBUG * Tokens:                      input=482, output=866, total=1348, reasoning=768              
+DEBUG * Prompt tokens details:       {'audio_tokens': 0, 'cached_tokens': 0}                       
+DEBUG * Completion tokens details:   {'accepted_prediction_tokens': 0, 'audio_tokens': 0,          
+      'reasoning_tokens': 768, 'rejected_prediction_tokens': 0}                                    
+DEBUG * Time:                        5.9500s                                                       
+DEBUG * Tokens per second:           145.5456 tokens/s                                             
+DEBUG **********************************  METRICS  **********************************              
+DEBUG Running: google_search(query=..., max_results=5, language=tr)                                
+DEBUG Searching Google [tr] for: Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma         
+      kampanyası                                                                                   
+DEBUG Running: google_search(query=..., max_results=5, language=tr)                                
+DEBUG Searching Google [tr] for: Türkiye bankacılık dijital kampanya performans ölçümü             
+DEBUG ===================================== tool ====================================              
+DEBUG Tool call Id: call_1z458XSZpcBKWMU6dqv8DNLA                                                  
+DEBUG [                                                                                            
+        {                                                                                          
+          "title": "",                                                                             
+          "url": "/search?num=7",                                                                  
+          "description": ""                                                                        
+        },                                                                                         
+        {                                                                                          
+          "title": "G\u00fcncel Kampanyalar - Fibabanka",                                          
+          "url": "https://www.fibabanka.com.tr/kampanyalar/musteriyim/guncel-ozel-kampanyalar",    
+          "description": " Fibabanka g\u00fcncel kampanyalar\u0131n\u0131 merak ediyor musunuz?    
+      Hemen g\u00fcncel kampanyalar sayfam\u0131z\u0131 ziyaret edin ve uygun kampanyalar\u0131    
+      g\u00f6r\u00fcnt\u00fcleyin! "                                                               
+        },                                                                                         
+        {                                                                                          
+          "title": "Kiraz Hesap Ba\u015fvurusu - Fibabanka",                                       
+          "url": "https://www.fibabanka.com.tr/basvuru-formlari/kiraz-hesap-basvuru-formu",        
+          "description": " G\u00f6r\u00fcnt\u00fcl\u00fc Bankac\u0131l\u0131k ile yeni             
+      m\u00fc\u015fterimiz olanlara \u00f6zel TL Kiraz Hesap'ta %46 Avantajl\u0131 Ho\u015f Geldin 
+      faiz oran\u0131na ek Fonlu Kiraz ile ayn\u0131 g\u00fcn +%2 ek faiz kazanarak\u00a0... "     
+        },                                                                                         
+        {                                                                                          
+          "title": "Ekstra Kazan - Fibabanka",                                                     
+          "url": "https://www.fibabanka.com.tr/bireysel/diger-urun-ve-hizmetlerimiz/ekstra-kazan", 
+          "description": " Ekstra Kazan'da her ay hedeflenen bankac\u0131l\u0131k i\u015flemlerini 
+      ger\u00e7ekle\u015ftirerek bir sonraki ay Kiraz Hesap'\u0131n\u0131za %2,50 ek faiz          
+      avantaj\u0131ndan faydalanabilirsiniz:. "                                                    
+        },                                                                                         
+        {                                                                                          
+          "title": "Ho\u015f Geldin Faizi Kiraz Hesap'ta! G\u00fcnl\u00fck Faiz Kazanmaya          
+      Ba\u015flay\u0131n!",                                                                        
+          "url": "https://www.fibabanka.com.tr/mevduat/kiraz-hesap",                               
+          "description": " G\u00f6r\u00fcnt\u00fcl\u00fc Bankac\u0131l\u0131kla kolayca            
+      m\u00fc\u015fterimiz olun ve Kiraz Hesap'\u0131n\u0131z\u0131 a\u00e7\u0131n %48'e varan     
+      avantajl\u0131 faiz oran\u0131ndan kazanmaya ba\u015flay\u0131n. TL Kiraz Hesap'ta %46       
+      Ho\u015f\u00a0... "                                                                          
+        }                                                                                          
+      ]                                                                                            
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG * Time:                        0.5824s                                                       
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG ===================================== tool ====================================              
+DEBUG Tool call Id: call_Cs9YZaQVMuEgEeIIOjrEB3V1                                                  
+DEBUG [                                                                                            
+        {                                                                                          
+          "title": "[PDF] t\u00fcrkiye dijital bankac\u0131l\u0131\u011f\u0131n\u0131n veri        
+      zarflama y\u00f6ntemi ile etkinlik analizi",                                                 
+          "url": "https://dergipark.org.tr/tr/download/article-file/4268144",                      
+          "description": " 18 Ara 2024  \u00b7  \u00e7al\u0131\u015fmada T\u00fcrkiye Dijital      
+      bankac\u0131l\u0131k performans\u0131 VZA y\u00f6ntemi ile analiz edilecektir. Bu            
+      \u00e7al\u0131\u015fma kapsam\u0131nda TBB'nin \u201cistatistiki raporlar\u00a0... "         
+        },                                                                                         
+        {                                                                                          
+          "title": "[PDF] Dijital Bankac\u0131l\u0131k Hizmetlerinin Banka Performans\u0131na      
+      Etkisi",                                                                                     
+          "url": "https://tisej.com/index.php/pub/article/view/1080/1080",                         
+          "description": " 8 Eyl 2023  \u00b7  Sonu\u00e7 olarak, dijital                          
+      bankac\u0131l\u0131l\u0131k uygulamalar\u0131 T\u00fcrk Bankac\u0131l\u0131k                 
+      Sekt\u00f6r\u00fc finansal performans\u0131 \u00fczerinde olumlu bir etkiye sahiptir. Bu     
+      sonu\u00e7\u00a0... "                                                                        
+        },                                                                                         
+        {                                                                                          
+          "title": "[PDF] ON Dijital - Strategy& Dijital Bankac\u0131l\u0131k Raporu -             
+      Strategyand.pwc.com",                                                                        
+          "url":                                                                                   
+      "https://www.strategyand.pwc.com/tr/tr/image/on-dijital-strategyand-dijital-bankacilik-raporu
+      -v3.pdf",                                                                                    
+          "description": " Bilgilendirme yetersizli\u011fi, g\u00fcven ve kolay                    
+      eri\u015filebilirlik gibi noktalar, T\u00fcrkiye'deki dijital bankalar i\u00e7in geli\u015fim
+      alanlar\u0131d\u0131rlar. Ele al\u0131nan kritik noktalar. "                                 
+        },                                                                                         
+        {                                                                                          
+          "title": "[PDF] bankac\u0131l\u0131kta performans \u00f6l\u00e7\u00fcm y\u00f6ntemleri ve
+      strateji se\u00e7iminin ...",                                                                
+          "url": "https://nek.istanbul.edu.tr/ekos/TEZ/60749.pdf",                                 
+          "description": " Aktif k\u00e2rl\u0131l\u0131\u011f\u0131, faiz d\u0131\u015f\u0131 gelir
+      gider oran\u0131, kaynak maliyeti oran\u0131, etkin getiri oran\u0131 \u015feklinde          
+      belirlenen d\u00f6rt performans kriteri se\u00e7ilmi\u015ftir. "                             
+        },                                                                                         
+        {                                                                                          
+          "title": "[PDF] T\u00fcrk Bankac\u0131l\u0131k Sekt\u00f6r\u00fcn\u00fcn Dijital         
+      \u00c7a\u011fda \u015eubele\u015fme ve Aktif ...",                                           
+          "url": "https://dergipark.org.tr/tr/download/article-file/4962504",                      
+          "description": " Bu durum \u015fubenin fiziki b\u00fcy\u00fckl\u00fc\u011f\u00fc ile     
+      orant\u0131l\u0131 performans g\u00f6sterilip g\u00f6sterilmedi\u011finin                    
+      \u00f6l\u00e7\u00fcmlemesine dayanan bir hesaplama y\u00f6ntemini de ortaya                  
+      \u00e7\u0131karm\u0131\u015ft\u0131r. M\u00b2\u00a0... "                                     
+        }                                                                                          
+      ]                                                                                            
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG * Time:                        0.7333s                                                       
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG ================================== assistant ==================================              
+DEBUG Aşağıda iki sorgu için en alakalı 3 URL ve kısa özetleri yer almaktadır.                     
+                                                                                                   
+      Sorgu 1: Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası                
+      - URL: https://www.fibabanka.com.tr/kampanyalar/musteriyim/guncel-ozel-kampanyalar           
+        Özet: Fibabanka’nın güncel kampanyalar sayfasında müşterilere yönelik özel kampanyalar     
+      listelenmekte; kampanyalar aracılığıyla hedeflenen müşteri segmentlerine yönelik teklifler   
+      sunulduğu anlaşılıyor.                                                                       
+      - URL: https://www.fibabanka.com.tr/bireysel/diger-urun-ve-hizmetlerimiz/ekstra-kazan        
+        Özet: Ekstra Kazan kampanyası ile aylık hedeflenen bankacılık işlemlerini gerçekleştiren   
+      müşterilere ek avantajlar (ör. ek faiz) sunulduğu belirtiliyor; kampanya yapısı müşterilerin 
+      işlem hacmini artırmayı hedefliyor olabilir.                                                 
+      - URL: https://www.fibabanka.com.tr/mevduat/kiraz-hesap                                      
+        Özet: Kiraz Hesap sayfası, yeni müşteri kazanımı ve hesap bazlı avantajlar sunan kampanya  
+      içeriği içeriyor; hoş geldin faizleri ve ek avantajlar, müşteri yatırımlarını ve işlem       
+      hacmini etkilemeyi amaçlayabilir.                                                            
+                                                                                                   
+      Sorgu 2: Türkiye bankacılık dijital kampanya performans ölçümü                               
+      - URL:                                                                                       
+      https://www.strategyand.pwc.com/tr/tr/image/on-dijital-strategyand-dijital-bankacilik-raporu-
+      v3.pdf                                                                                       
+        Özet: PwC Strategy& tarafından hazırlanan ON Dijital Dijital Bankacılık raporu; Türkiye’de 
+      dijital bankacılık performansı, ölçüm kriterleri ve gelişim alanları hakkında kapsamlı       
+      bilgiler sunuyor.                                                                            
+      - URL: https://tisej.com/index.php/pub/article/view/1080/1080                                
+        Özet: Dijital Bankacılık Hizmetlerinin Banka Performansına Etkisi başlıklı makale; dijital 
+      bankacılık uygulamalarının finansal performans üzerindeki etkilerini inceleyen bilimsel      
+      çalışma.                                                                                     
+      - URL: https://dergipark.org.tr/tr/download/article-file/4962504                             
+        Özet: Türk Bankacılığının Dijital Çağda Şubeleşme ve Aktif... başlıklı Dergipark makalesi; 
+      dijitalleşmenin banka performans ve operasyonel dinamikler üzerindeki etkilerini ele alıyor; 
+      dijitalleşme ile performans ölçümüne ilişkin içgörüler sunuyor.                              
+DEBUG **********************************  METRICS  **********************************              
+DEBUG * Tokens:                      input=2061, output=3767, total=5828, reasoning=3200           
+DEBUG * Prompt tokens details:       {'audio_tokens': 0, 'cached_tokens': 0}                       
+DEBUG * Completion tokens details:   {'accepted_prediction_tokens': 0, 'audio_tokens': 0,          
+      'reasoning_tokens': 3200, 'rejected_prediction_tokens': 0}                                   
+DEBUG * Time:                        18.1268s                                                      
+DEBUG * Tokens per second:           207.8138 tokens/s                                             
+DEBUG **********************************  METRICS  **********************************              
+DEBUG -------------------------- OpenAI Async Response End --------------------------              
+DEBUG Added RunResponse to Memory                                                                  
+DEBUG ************* Agent Run End: d45163e0-c46f-4eb1-8036-ae9a16175669 *************              
+DEBUG Updated team context with member name: Araştırmacı                                           
+DEBUG ===================================== tool ====================================              
+DEBUG Tool call Id: call_yUXM5IjKHkjw5mU6B30fpBbe                                                  
+DEBUG Aşağıda iki sorgu için en alakalı 3 URL ve kısa özetleri yer almaktadır.                     
+                                                                                                   
+      Sorgu 1: Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası                
+      - URL: https://www.fibabanka.com.tr/kampanyalar/musteriyim/guncel-ozel-kampanyalar           
+        Özet: Fibabanka’nın güncel kampanyalar sayfasında müşterilere yönelik özel kampanyalar     
+      listelenmekte; kampanyalar aracılığıyla hedeflenen müşteri segmentlerine yönelik teklifler   
+      sunulduğu anlaşılıyor.                                                                       
+      - URL: https://www.fibabanka.com.tr/bireysel/diger-urun-ve-hizmetlerimiz/ekstra-kazan        
+        Özet: Ekstra Kazan kampanyası ile aylık hedeflenen bankacılık işlemlerini gerçekleştiren   
+      müşterilere ek avantajlar (ör. ek faiz) sunulduğu belirtiliyor; kampanya yapısı müşterilerin 
+      işlem hacmini artırmayı hedefliyor olabilir.                                                 
+      - URL: https://www.fibabanka.com.tr/mevduat/kiraz-hesap                                      
+        Özet: Kiraz Hesap sayfası, yeni müşteri kazanımı ve hesap bazlı avantajlar sunan kampanya  
+      içeriği içeriyor; hoş geldin faizleri ve ek avantajlar, müşteri yatırımlarını ve işlem       
+      hacmini etkilemeyi amaçlayabilir.                                                            
+                                                                                                   
+      Sorgu 2: Türkiye bankacılık dijital kampanya performans ölçümü                               
+      - URL:                                                                                       
+      https://www.strategyand.pwc.com/tr/tr/image/on-dijital-strategyand-dijital-bankacilik-raporu-
+      v3.pdf                                                                                       
+        Özet: PwC Strategy& tarafından hazırlanan ON Dijital Dijital Bankacılık raporu; Türkiye’de 
+      dijital bankacılık performansı, ölçüm kriterleri ve gelişim alanları hakkında kapsamlı       
+      bilgiler sunuyor.                                                                            
+      - URL: https://tisej.com/index.php/pub/article/view/1080/1080                                
+        Özet: Dijital Bankacılık Hizmetlerinin Banka Performansına Etkisi başlıklı makale; dijital 
+      bankacılık uygulamalarının finansal performans üzerindeki etkilerini inceleyen bilimsel      
+      çalışma.                                                                                     
+      - URL: https://dergipark.org.tr/tr/download/article-file/4962504                             
+        Özet: Türk Bankacılığının Dijital Çağda Şubeleşme ve Aktif... başlıklı Dergipark makalesi; 
+      dijitalleşmenin banka performans ve operasyonel dinamikler üzerindeki etkilerini ele alıyor; 
+      dijitalleşme ile performans ölçümüne ilişkin içgörüler sunuyor.                              
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG * Time:                        0.0009s                                                       
+DEBUG ********************************  TOOL METRICS  *******************************              
+DEBUG ================================== assistant ==================================              
+DEBUG Tool Calls:                                                                                  
+        - ID: 'call_R2pDUT9d4pP0rr2Ms7zdksyI'                                                      
+          Name: 'transfer_task_to_member'                                                          
+          Arguments: 'member_id: analist, task_description: Araştırmacı tarafından sağlanan iki    
+      araştırma sorgusu için içerik analizi yap: Fibabanka müşteri segmentasyonu aylık işlem hacmi 
+      artırma kampanyası ve Türkiye bankacılık dijital kampanya performans ölçümü. Sağlanan        
+      URL'lerden içerikleri incele ve analiz raporu halinde sun. Rapor içeriği aşağıdaki odak      
+      noktalarını kapsasın: - Mevcut aylık işlem hacmi temel göstergeleri: kullanıcı başına aylık  
+      işlem adedi, hacim, ortalama işlem büyüklüğü - Segment tablosu ve karlılık analizi: yeni ve  
+      mevcut müşteriler, segmentlere göre hacim ve potansiyel - Kampanya yapısı ve hedefleri:      
+      cashback, ödül puanı veya ücret muafiyetinin ARPU ve hacime etkisi - Kanal etkisi ve iletişim
+      stratejisi: mobil uygulama bildirimleri, push, SMS, e-posta ve in-app mesajlarının dönüşüm   
+      etkisi - Teşvik duyarlılığı ve fatigue riskleri: farklı teşvik türlerinin etkisi ve zamanla  
+      azalma potansiyeli - A/B test planı ve KPI'lar: inkremental işlem adedi, inc. revenue, ROI,  
+      payback dönemi ve statistical significance - Veri altyapısı ve kalite güvencesi: CRM, core   
+      banking, data warehouse entegrasyonu, veri hijyeni ve güvenlik/loglama, expected_output:     
+      Analiz raporu: (1) Mevcut aylık işlem hacmi göstergeleri; (2) Segment tablosu ve karlılık    
+      analizi; (3) Kampanya yapısı ve etkileri; (4) Kanal etkisi; (5) Teşvik duyarlılığı; (6) A/B  
+      test planı ve KPI'lar; (7) Veri altyapısı ve kalite güvence. Ayrıca hangi boşluklar ve veri  
+      eksiklikleri var.'                                                                           
+        - ID: 'call_IEzSdqnY11V4zGI7QPVBIvxD'                                                      
+          Name: 'transfer_task_to_member'                                                          
+          Arguments: 'member_id: iş-planı-uzmanı, task_description: Analist tarafından oluşturulan 
+      analiz çıktısına dayanarak 3 dosya oluşturun: pain_points.md, roadmap.md,                    
+      business_strategy.md. Dosyaların içeriği Analist'in analiziyle uyumlu olacak şekilde ve      
+      paylaşılan hedeflerle uyumlu olacaktır., expected_output: pain_points.md, roadmap.md,        
+      business_strategy.md dosyaları proje dizininde oluşturulmuş ve içerikleri aynen dökülebilir  
+      formatta.'                                                                                   
+DEBUG **********************************  METRICS  **********************************              
+DEBUG * Tokens:                      input=3244, output=2739, total=5983, cached=2304,             
+      reasoning=2176                                                                               
+DEBUG * Prompt tokens details:       {'audio_tokens': 0, 'cached_tokens': 2304}                    
+DEBUG * Completion tokens details:   {'accepted_prediction_tokens': 0, 'audio_tokens': 0,          
+      'reasoning_tokens': 2176, 'rejected_prediction_tokens': 0}                                   
+DEBUG * Time:                        15.0837s                                                      
+DEBUG * Tokens per second:           181.5873 tokens/s                                             
+DEBUG **********************************  METRICS  **********************************              
+DEBUG Running: transfer_task_to_member(member_id=analist, task_description=...,                    
+      expected_output=...)                                                                         
+DEBUG Running: transfer_task_to_member(member_id=iş-planı-uzmanı, task_description=...,            
+      expected_output=...)                                                                         
+DEBUG *************** Session ID: 53e48556-c0dc-4c4b-9a6d-7465c5c1b921 **************              
+DEBUG **************** Agent ID: 4a47c33b-460f-4ed8-a1f2-2e5eeab10116 ***************              
+DEBUG ************ Agent Run Start: 365af5fe-e7a3-4607-8a58-fe7832c275dc ************              
+DEBUG ------------------------- OpenAI Async Response Start -------------------------              
+DEBUG ------------------------------ Model: gpt-5-nano ------------------------------              
+DEBUG ==================================== system ===================================              
+DEBUG <instructions>                                                                               
+      - Sen bir İş Analistisisin. Verilen içerikleri analiz eder ve bulgularını raporlarsın.       
+      - Pazar trendleri, fırsatlar ve rakip analizi yap.                                           
+      - YASAK: Ek öneri sunma, izin isteme, yorum ekleme.                                          
+      </instructions>                                                                              
+                                                                                                   
+      <additional_information>                                                                     
+      - Use markdown to format your answers.                                                       
+      </additional_information>                                                                    
+DEBUG ===================================== user ====================================              
+DEBUG You are a member of a team of agents. Your goal is to complete the following task:           
+                                                                                                   
+      <task>                                                                                       
+      Araştırmacı tarafından sağlanan iki araştırma sorgusu için içerik analizi yap: Fibabanka     
+      müşteri segmentasyonu aylık işlem hacmi artırma kampanyası ve Türkiye bankacılık dijital     
+      kampanya performans ölçümü. Sağlanan URL'lerden içerikleri incele ve analiz raporu halinde   
+      sun. Rapor içeriği aşağıdaki odak noktalarını kapsasın: - Mevcut aylık işlem hacmi temel     
+      göstergeleri: kullanıcı başına aylık işlem adedi, hacim, ortalama işlem büyüklüğü - Segment  
+      tablosu ve karlılık analizi: yeni ve mevcut müşteriler, segmentlere göre hacim ve potansiyel 
+      - Kampanya yapısı ve hedefleri: cashback, ödül puanı veya ücret muafiyetinin ARPU ve hacime  
+      etkisi - Kanal etkisi ve iletişim stratejisi: mobil uygulama bildirimleri, push, SMS, e-posta
+      ve in-app mesajlarının dönüşüm etkisi - Teşvik duyarlılığı ve fatigue riskleri: farklı teşvik
+      türlerinin etkisi ve zamanla azalma potansiyeli - A/B test planı ve KPI'lar: inkremental     
+      işlem adedi, inc. revenue, ROI, payback dönemi ve statistical significance - Veri altyapısı  
+      ve kalite güvencesi: CRM, core banking, data warehouse entegrasyonu, veri hijyeni ve         
+      güvenlik/loglama                                                                             
+      </task>                                                                                      
+                                                                                                   
+      <expected_output>                                                                            
+      Analiz raporu: (1) Mevcut aylık işlem hacmi göstergeleri; (2) Segment tablosu ve karlılık    
+      analizi; (3) Kampanya yapısı ve etkileri; (4) Kanal etkisi; (5) Teşvik duyarlılığı; (6) A/B  
+      test planı ve KPI'lar; (7) Veri altyapısı ve kalite güvence. Ayrıca hangi boşluklar ve veri  
+      eksiklikleri var.                                                                            
+      </expected_output>                                                                           
+                                                                                                   
+      <member interactions>                                                                        
+      Member: Araştırmacı                                                                          
+      Task: İki araştırma sorgusunu yürüt: 1) Fibabanka müşteri segmentasyonu aylık işlem hacmi    
+      artırma kampanyası; 2) Türkiye bankacılık dijital kampanya performans ölçümü. Her sorgu için 
+      güvenilir kaynaklardan en az 5-7 URL topla ve her kaynağı kısa bir özetle birlikte sun.      
+      Response: Aşağıda iki sorgu için en alakalı 3 URL ve kısa özetleri yer almaktadır.           
+                                                                                                   
+      Sorgu 1: Fibabanka müşteri segmentasyonu aylık işlem hacmi artırma kampanyası                
+      - URL: https://www.fibabanka.com.tr/kampanyalar/musteriyim/guncel-ozel-kampanyalar           
+        Özet: Fibabanka’nın güncel kampanyalar sayfasında müşterilere yönelik özel kampanyalar     
+      listelenmekte; kampanyalar aracılığıyla hedeflenen müşteri segmentlerine yönelik teklifler   
+      sunulduğu anlaşılıyor.                                                                       
+      - URL: https://www.fibabanka.com.tr/bireysel/diger-urun-ve-hizmetlerimiz/ekstra-kazan        
+        Özet: Ekstra Kazan kampanyası ile aylık hedeflenen bankacılık işlemlerini gerçekleştiren   
+      müşterilere ek avantajlar (ör. ek faiz) sunulduğu belirtiliyor; kampanya yapısı müşterilerin 
+      işlem hacmini artırmayı hedefliyor olabilir.                                                 
+      - URL: https://www.fibabanka.com.tr/mevduat/kiraz-hesap                                      
+        Özet: Kiraz Hesap sayfası, yeni müşteri kazanımı ve hesap bazlı avantajlar sunan kampanya  
+      içeriği içeriyor; hoş geldin faizleri ve ek avantajlar, müşteri yatırımlarını ve işlem       
+      hacmini etkilemeyi amaçlayabilir.                                                            
+                                                                                                   
+      Sorgu 2: Türkiye bankacılık dijital kampanya performans ölçümü                               
+      - URL:                                                                                       
+      https://www.strategyand.pwc.com/tr/tr/image/on-dijital-strategyand-dijital-bankacilik-raporu-
+      v3.pdf                                                                                       
+        Özet: PwC Strategy& tarafından hazırlanan ON Dijital Dijital Bankacılık raporu; Türkiye’de 
+      dijital bankacılık performansı, ölçüm kriterleri ve gelişim alanları hakkında kapsamlı       
+      bilgiler sunuyor.                                                                            
+      - URL: https://tisej.com/index.php/pub/article/view/1080/1080                                
+        Özet: Dijital Bankacılık Hizmetlerinin Banka Performansına Etkisi başlıklı makale; dijital 
+      bankacılık uygulamalarının finansal performans üzerindeki etkilerini inceleyen bilimsel      
+      çalışma.                                                                                     
+      - URL: https://dergipark.org.tr/tr/download/article-file/4962504                             
+        Özet: Türk Bankacılığının Dijital Çağda Şubeleşme ve Aktif... başlıklı Dergipark makalesi; 
+      dijitalleşmenin banka performans ve operasyonel dinamikler üzerindeki etkilerini ele alıyor; 
+      dijitalleşme ile performans ölçümüne ilişkin içgörüler sunuyor.                              
+                                                                                                   
+      </member interactions>       

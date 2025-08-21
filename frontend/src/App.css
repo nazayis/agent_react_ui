@@ -278,6 +278,13 @@ body {
   flex-shrink: 0; /* Küçülmesini engelle */
 }
 
+/* Input ve icon butonu aynı satırda */
+.input-area .input-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
 .input-area input {
   width: 100%;
   padding: 15px;
@@ -288,6 +295,13 @@ body {
   background-color: #2c2c2e;
   color: #f5f5f7;
   box-sizing: border-box;
+}
+
+/* Satır içindeki input için override */
+.input-area .input-row input {
+  width: auto;
+  flex: 1;
+  margin-bottom: 0;
 }
 
 .input-area input::placeholder {
@@ -310,6 +324,32 @@ body {
   font-size: 1rem;
   font-weight: 500;
   transition: background-color 0.2s;
+}
+
+/* Küçük gönder butonu */
+.input-area .send-button {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.send-button:hover:not(:disabled) {
+  background-color: #005ecb;
+}
+
+.send-button:disabled {
+  background-color: #555;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.send-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .input-area button:hover:not(:disabled) {
@@ -494,8 +534,8 @@ body {
 /* Step Item - Her adım için */
 .step-item {
   display: flex;
-  align-items: flex-start;
-  gap: 20px;
+  align-items: center;
+  gap: 0;
   position: relative;
 }
 
@@ -506,7 +546,8 @@ body {
   background: linear-gradient(135deg, #007aff, #5856d6);
   border-radius: 12px;
   padding: 16px 20px;
-  min-width: 140px;
+  width: 100px;
+  height: 45px;
   box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
   flex-shrink: 0;
 }
@@ -526,20 +567,22 @@ body {
 
 /* Step Connector - Bağlantı çizgileri */
 .step-connector {
-  width: 2px;
-  background: linear-gradient(to bottom, #007aff, #3a3a3c);
-  margin: 0 20px;
-  height: 40px;
+  width: 16px;
+  height: 2px;
+  background: linear-gradient(to right, #007aff, #3a3a3c);
+  margin: 0;
+  align-self: center;
   flex-shrink: 0;
 }
 
 .step-item:last-child .step-connector {
-  display: none;
+  display: block;
 }
 
 /* Step Editor - Düzenleme alanları */
 .step-editor {
-  flex: 1;
+  flex: 0 1 45%;
+  max-width: 900px;
   background: rgba(44, 44, 46, 0.6);
   border: 2px solid #3a3a3c;
   border-radius: 12px;
@@ -577,7 +620,8 @@ body {
   transition: all 0.2s ease-in-out;
   font-family: inherit;
   height: 32px;
-  max-width: 50%;
+  width: 100%;
+  max-width: 100%;
 }
 
 .query-input:focus, .analysis-input:focus {
@@ -599,20 +643,22 @@ body {
 
 /* Remove Button */
 .remove-btn {
-  width: 32px;
-  height: 32px;
+  width: 25px;
+  aspect-ratio: 1 / 1;
   background: #ff3b30;
   border: none;
   border-radius: 50%;
   color: white;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease-in-out;
-  flex-shrink: 0;
+  transition: transform 0.12s ease-in-out, background-color 0.12s ease-in-out;
+  flex: 0 0 auto;
 }
 
 .remove-btn:hover {
@@ -631,7 +677,7 @@ body {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease-in-out;
-  width: 50%;
+  width: 93.5%;
   height: 32px;
 }
 
@@ -669,7 +715,8 @@ body {
   transition: all 0.2s ease-in-out;
   font-family: inherit;
   height: 32px;
-  max-width: 50%;
+  width: 100%;
+  max-width: 100%;
 }
 
 .output-input:focus {
@@ -695,7 +742,8 @@ body {
   background-color: #0f0f0f;
   border: 2px solid #007aff;
   border-radius: 8px;
-  max-width: 50%;
+  width: 90%;
+  max-width: 100%;
 }
 
 .fixed-format-display span {
@@ -731,6 +779,12 @@ body {
     justify-content: center;
     min-width: auto;
     width: 100%;
+  }
+
+  .step-editor {
+    width: 100%;
+    max-width: 100%;
+    flex: 1 1 auto;
   }
   
   .output-info {

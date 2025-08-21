@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './App.css';
+import sendIcon from './assets/send.svg';
 
 // ProgressIndicator bileşeni güncellendi
 const ProgressIndicator = ({ stage, progress, message }) => {
@@ -27,9 +28,24 @@ const ProgressIndicator = ({ stage, progress, message }) => {
 
 // Plan Editor - Step-by-step görsel akış tasarımı
 const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
+  const defaultFiles = ['pain_points.md', 'roadmap.md', 'business_strategy.md'];
+  const inferFilesFromPlan = () => {
+    if (Array.isArray(plan?.output_files) && plan.output_files.length > 0) {
+      return plan.output_files;
+    }
+    if (typeof plan?.output_format === 'string' && plan.output_format.trim()) {
+      return plan.output_format
+        .split('\n')
+        .map(s => (s || '').trim())
+        .filter(Boolean);
+    }
+    return defaultFiles;
+  };
+
   const [editedPlan, setEditedPlan] = useState({
     research_queries: plan?.research_queries || [],
-    analysis_focus: plan?.analysis_focus || []
+    analysis_focus: plan?.analysis_focus || [],
+    output_files: inferFilesFromPlan()
   });
 
   const handleQueriesChange = (queries) => {
@@ -40,8 +56,33 @@ const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
     setEditedPlan(prev => ({ ...prev, analysis_focus: focuses }));
   };
 
+  const updateOutputFile = (index, value) => {
+    const files = [...(editedPlan.output_files || [])];
+    files[index] = value;
+    setEditedPlan(prev => ({ ...prev, output_files: files }));
+  };
+
+  const removeOutputFile = (index) => {
+    const files = (editedPlan.output_files || []).filter((_, i) => i !== index);
+    setEditedPlan(prev => ({ ...prev, output_files: files }));
+  };
+
+  const addOutputFile = () => {
+    const files = editedPlan.output_files || [];
+    if (files.length >= 3) return; // en fazla 3 dosya
+    setEditedPlan(prev => ({ ...prev, output_files: [...files, ''] }));
+  };
+
   const handleConfirm = () => {
-    onConfirm(editedPlan);
+    const files = (editedPlan.output_files || [])
+      .map(f => (f || '').trim())
+      .filter(Boolean);
+    const normalizedFiles = (files.length ? files : defaultFiles).slice(0, 3);
+    onConfirm({
+      ...editedPlan,
+      output_files: normalizedFiles,
+      output_format: normalizedFiles.join('\n')
+    });
   };
 
   const addQuery = () => {
@@ -176,13 +217,44 @@ const PlanEditor = ({ plan, onConfirm, onCancel, isReadonly = false }) => {
             <div className="step-number">3</div>
             <div className="step-title">Çıktı</div>
           </div>
+          <div className="step-connector"></div>
           <div className="step-editor">
             <div className="output-info">
               <div className="output-item">
                 <label>Format:</label>
-                <div className="fixed-format-display">
-                  <span>3 dosya: pain_points.md, roadmap.xlsx, business_strategy.md</span>
-                </div>
+                {isReadonly ? (
+                  <div className="fixed-format-display">
+                    {(editedPlan.output_files || defaultFiles).map((line, idx) => (
+                      <div key={idx}><span>{line}</span></div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="analysis-list">
+                    {(editedPlan.output_files || []).map((file, idx) => (
+                      <div key={idx} className="analysis-item">
+                        <input
+                          type="text"
+                          className="output-input"
+                          value={file}
+                          onChange={(e) => updateOutputFile(idx, e.target.value)}
+                          placeholder={defaultFiles[idx] || 'dosya.md'}
+                        />
+                        <button 
+                          className="remove-btn"
+                          onClick={() => removeOutputFile(idx)}
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    {editedPlan.output_files.length < 3 && (
+                      <button className="add-btn" onClick={addOutputFile} type="button">
+                        + Yeni Dosya Ekle
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -250,7 +322,13 @@ function App() {
       const data = await response.json();
       
       if (response.ok && data.success) {
-        setPendingPlan(data.plan);
+        // Normalize analysis_focus to exactly 3 items for initial render
+        const rawFocus = Array.isArray(data?.plan?.analysis_focus) ? data.plan.analysis_focus : [];
+        const normalizedFocus = Array.from(new Set(rawFocus.map(f => (f || '').trim()).filter(f => f))).slice(0, 3);
+        const paddedFocus = normalizedFocus.concat(Array(Math.max(0, 3 - normalizedFocus.length)).fill(''));
+        const normalizedPlan = { ...data.plan, analysis_focus: paddedFocus };
+
+        setPendingPlan(normalizedPlan);
         setPlanEditorState('editing');
         setCurrentStage({ stage: 'approval', progress: 40, message: 'Plan onayınızı bekliyor...' });
         setIsLoading(false);
@@ -274,9 +352,18 @@ function App() {
       .map(f => (f || '').trim())
       .filter(f => f);
 
+    const rawFormat = typeof confirmedPlan?.output_format === 'string'
+      ? confirmedPlan.output_format
+      : Array.isArray(confirmedPlan?.output_files)
+        ? confirmedPlan.output_files.join('\n')
+        : '';
+    const sanitizedFiles = rawFormat.split('\n').map(s => (s || '').trim()).filter(Boolean);
+    const normalizedFormat = sanitizedFiles.join('\n') || 'pain_points.md\nroadmap.md\nbusiness_strategy.md';
+
     const sanitizedPlan = {
       research_queries: limitedQueries,
-      analysis_focus: sanitizedFocus
+      analysis_focus: sanitizedFocus,
+      output_format: normalizedFormat
     };
 
     setApprovedPlan(sanitizedPlan);
@@ -383,20 +470,24 @@ function App() {
               message={currentStage.message}
             />
           )}
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="kullanıcı input chat box"
-            disabled={isLoading || planEditorState === 'editing'}
-          />
-          <button 
-            onClick={sendMessage} 
-            disabled={isLoading || planEditorState === 'editing'}
-          >
-            Gönder
-          </button>
+          <div className="input-row">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="kullanıcı input chat box"
+              disabled={isLoading || planEditorState === 'editing'}
+            />
+            <button 
+              onClick={sendMessage} 
+              disabled={isLoading || planEditorState === 'editing'}
+              className="send-button"
+              aria-label="Gönder"
+            >
+              <img src={sendIcon} alt="Send" className="send-icon" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
