@@ -256,51 +256,12 @@ def execute_plan_endpoint():
             # 4. İş Planı ve Strateji Uzmanı
             file1, file2, file3 = sanitized_plan['output_files']
             proposer_instructions = [
-                "Sen bir İş Stratejistisisin. Analiz sonuçlarından 3 ayrı dosya hazırlarsın.",
-                "",
-                "GÖREV: Şu 3 dosyayı sırasıyla oluştur:",
-                "",
-                f"1. DOSYA: 'output/{file1}'",
-                "Default içerik pain_points.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
-                "pain_points.md"
-                "- Proje fikrinin acı noktaları",
-                "- Competitor'ların yaptıkları analizi",
-                "- Bu sorunların üstesinden gelme yöntemleri",
-                "- Araştırma aşamasında öğrenilen kritik bilgiler",
-                "- Pazar eksiklikleri ve fırsatlar",
-                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
-                "",
-                f"2. DOSYA: 'output/{file2}'",
-                "Default içerik roadmap.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
-                "İÇERİK (.md formatında kaydet, bu dosya içerisinde tablo oluştur):",
-                "- Hafta bazında görev planı",
-                "- Development aşamaları (Planning, Design, Development, Testing, Launch)",
-                "- Her görevin hangi aşamaya ait olduğu",
-                "- Sorumlu kişi/ekip bilgisi",
-                "- Başlangıç ve bitiş tarihleri",
-                "- Öncelik seviyeleri",
-                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
-                "",
-                f"3. DOSYA: 'output/{file3}'",
-                "Default içerik business_strategy.md Kullanıcı farklı bir dosya içeriği istemediği sürece, bunu kullan",
-                "business_strategy.md"
-                "İÇERİK (9 ana bölüm):",
-                "- YÖNETİCİ ÖZETİ",
-                "- ANALİZ BULGULARI", 
-                "- KARAR VERİ SÜRECİ",
-                "- STRATEJİK KARARLAR",
-                "- HEDEFLENEN SONUÇLAR",
-                "- UYGULAMA PLANI",
-                "- ZAMAN ÇİZELGESİ",
-                "- RİSK ANALİZİ",
-                "Eğer senden farklı bir dosya içeriği istenirse, o dosya içeriğini kullan."
-                "",
-                "KURALLAR:",
-                "- Üç dosyayı da (Türkçe) sırasıyla oluştur ve kaydet",
-                "- Her dosya detaylı ve kapsamlı olmalı",
-                "- Roadmap dosyasının içeriğini tablo formatında oluştur, .md olarak kaydet",
-                "- İzin isteme, onay bekleme",
-                "",
+                "Rol: İş Stratejisti. Türkçe yaz. 3 dosya üret ve kaydet: 'output/{file1}', 'output/{file2}', 'output/{file3}'.",
+                "Genel: Paragraf ağırlıklı, kısa cümleler; jargon ilk geçtiğinde açıkla; onay/öneri isteme; süreç anlatma.",
+                f"1) 'output/{file1}' (pain_points.md): Giriş paragrafı; 3-5 acı noktası (problem, iş etkisi, kanıt); fırsat çerçevesi; küçük KPI tablosu (KPI | mevcut | hedef).",
+                f"2) 'output/{file2}' (roadmap.md): KULLANICININ DANIŞTIĞI ÜRÜNÜN ROADMAP'i. Markdown TABLO ZORUNLU. Başlıklar AYNEN: Sprint/Release | Epic/Feature | User Story/Kapsam | Aşama (Discovery, Design, Build, Test, Launch) | Sorumlu (kişi/ekip) | Başlangıç (YYYY-MM-DD) | Bitiş (YYYY-MM-DD) | Öncelik (Yüksek/Orta/Düşük) | Bağımlılıklar | KPI/Metrik (ör. aktivasyon oranı, NPS, hata oranı). En az 5-8 satır. Aşağıdaki TERİMLER GEÇMEYECEK: Araştırmacı, İçerik Okuyucu, Analist, İş Planı Uzmanı, Koordinatör, ajan, adım, süreç, araştırma, okuma, analiz, ekip, team, koordine, koordinatör. Sadece ürün/feature planı.",
+                f"3) 'output/{file3}' (business_strategy.md): Önerilen bölümler: Yönetsel Özet; Analiz Bulguları; Değer Önerisi ve Ürün Stratejisi; Go-to-Market ve Büyüme; Zaman Çizelgesi Özeti; Riskler ve Önlemler; KPI ve Hedefler; Sonraki Adım.",
+                "Kayıt: write_file aracıyla kaydet."
             ]
             proposer = Agent(
                 name="İş Planı Uzmanı",
@@ -338,7 +299,7 @@ def execute_plan_endpoint():
             analysis_team = Team(
                 name="İş Strateji Takımı",
                 mode="coordinate",
-                model=OpenAIChat(id="gpt-5-nano"),
+                model=OpenAIChat(id="gpt-4o"),
                 members=[searcher, reader, analyzer, proposer],
                 tools=[fs_tools],
                 user_id=user_id,
@@ -371,9 +332,88 @@ ANALİZ ODAKLARI:
 
             response = await analysis_team.arun(f"Bu araştırma ve analiz planını takımımla birlikte tamamen uygula:\n{plan_text}")
             
+            # Read generated output files and include them as structured documents
+            documents = []
+            try:
+                output_files = sanitized_plan.get('output_files', [])
+                for fname in output_files:
+                    file_path = OUTPUT_DIR / fname
+                    try:
+                        content = file_path.read_text(encoding='utf-8')
+                    except FileNotFoundError:
+                        content = f"Dosya bulunamadı: {file_path}"
+                    except Exception as e:
+                        content = f"Dosya okunurken hata oluştu ({file_path}): {str(e)}"
+                    documents.append({
+                        'filename': str(fname),
+                        'content': content
+                    })
+            except Exception as e:
+                documents = [{
+                    'filename': 'error',
+                    'content': f'Dokümanları okurken beklenmeyen bir hata oluştu: {str(e)}'
+                }]
+            
+            # Roadmap doğrulama ve gerekirse yeniden yazdırma
+            try:
+                roadmap_name = sanitized_plan.get('output_files', [None, None, None])[1]
+                if roadmap_name:
+                    roadmap_path = OUTPUT_DIR / roadmap_name
+                    roadmap_content = ""
+                    try:
+                        roadmap_content = roadmap_path.read_text(encoding='utf-8')
+                    except Exception:
+                        roadmap_content = ""
+
+                    banned_terms = [
+                        "Araştırmacı", "İçerik Okuyucu", "Analist", "İş Planı Uzmanı", "Koordinatör",
+                        "ajan", "adım", "süreç", "araştırma", "okuma", "analiz", "ekip", "team", "koordine", "koordinatör"
+                    ]
+                    required_headers = [
+                        "Sprint/Release", "Epic/Feature", "User Story/Kapsam", "Aşama", "Sorumlu",
+                        "Başlangıç", "Bitiş", "Öncelik", "Bağımlılıklar", "KPI/Metrik"
+                    ]
+
+                    def is_invalid_roadmap(text: str) -> bool:
+                        lower = text.lower()
+                        has_banned = any(term.lower() in lower for term in banned_terms)
+                        has_table = "|" in text and "---" in text
+                        has_all_headers = all(h in text for h in required_headers)
+                        return (not has_table) or (not has_all_headers) or has_banned
+
+                    if is_invalid_roadmap(roadmap_content):
+                        fix_prompt = dedent(f"""
+                        'output/{roadmap_name}' dosyası ürün ROADMAP'ı formatında DEĞİL. Şimdi yalnızca bu dosyayı yeniden yaz.
+                        ZORUNLU:
+                        - .md TABLO kullan
+                        - Sütun başlıkları AYNEN: Sprint/Release | Epic/Feature | User Story/Kapsam | Aşama (Discovery, Design, Build, Test, Launch) | Sorumlu (kişi/ekip) | Başlangıç (YYYY-MM-DD) | Bitiş (YYYY-MM-DD) | Öncelik (Yüksek/Orta/Düşük) | Bağımlılıklar | KPI/Metrik (ör. aktivasyon oranı, NPS, hata oranı)
+                        - En az 5-8 satır
+                        - Aşağıdaki terimleri ve ajan süreçlerini KULLANMA: {', '.join(banned_terms)}
+                        - Yalnızca ürün, özellikler, kullanıcı hikayeleri ve teslimat planına odaklan
+                        EYLEM:
+                        - Doğru içerikle 'output/{roadmap_name}' dosyasını yaz (write_file aracıyla) ve kaydet
+                        - Başka metin döndürme
+                        """)
+                        try:
+                            await proposer.arun(fix_prompt)
+                            # Dosyayı tekrar oku ve documents içine güncellenmiş halini yansıt
+                            try:
+                                corrected = roadmap_path.read_text(encoding='utf-8')
+                                for d in documents:
+                                    if d.get('filename') == str(roadmap_name):
+                                        d['content'] = corrected
+                                        break
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            
             return jsonify({
                 'success': True,
                 'result': response.content,
+                'documents': documents,
                 'session_id': session_id,
                 'message': 'Plan takım tarafından başarıyla uygulandı. İş stratejisi tamamlandı ve kaydedildi.'
             })

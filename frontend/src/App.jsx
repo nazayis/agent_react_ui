@@ -5,23 +5,60 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './App.css';
 import sendIcon from './assets/send.svg';
+import fbLogo from './assets/fb-logo.png';
+import html2pdf from 'html2pdf.js';
+import downloadIcon from './assets/download.svg';
 
 // ProgressIndicator bileşeni güncellendi
 const ProgressIndicator = ({ stage, progress, message }) => {
+  const STAGES = ['Başlangıç', 'Plan Üretimi', 'Plan Onayı', 'Araştırma', 'Analiz & Yazım', 'Tamamlandı'];
+  const stageOrder = { init: 0, generate: 1, approval: 2, research: 3, analyze: 4, completed: 5 };
+  const activeIndex = stageOrder[stage] ?? 0;
+
   return (
     <div className="progress-container">
-      <div className="progress-bar-container">
-        <div className="progress-bar-fill" style={{ width: `${progress}%` }}/>
-      </div>
-      <div className="progress-stages">
-        <div className={`stage ${progress >= 0 ? 'active' : ''}`}>Başlangıç</div>
-        <div className={`stage ${progress >= 25 ? 'active' : ''}`}>Plan Üretimi</div>
-        <div className={`stage ${progress >= 40 ? 'active' : ''}`}>Plan Onayı</div>
-        <div className={`stage ${progress >= 60 ? 'active' : ''}`}>Araştırma</div>
-        <div className={`stage ${progress >= 80 ? 'active' : ''}`}>Analiz & Yazım</div>
-        <div className={`stage ${progress >= 100 ? 'active' : ''}`}>Tamamlandı</div>
+      <div className="stepper">
+        {STAGES.map((label, i) => {
+          const status = i < activeIndex ? 'done' : i === activeIndex ? 'active' : 'pending';
+          return (
+            <div key={label} className={`stepper-item ${status}`} aria-current={i === activeIndex ? 'step' : undefined}>
+              <div className="stepper-circle" />
+              <div className="stepper-label">{label}</div>
+            </div>
+          );
+        })}
       </div>
       <div className="progress-message">{message}</div>
+    </div>
+  );
+};
+
+// Tek bir dokümanı baloncuk olarak gösteren bileşen
+const DocumentBubble = ({ filename, content }) => {
+  const contentRef = useRef(null);
+
+  const handleDownload = () => {
+    if (!contentRef.current) return;
+    const fileBase = (filename || 'document').replace(/\s+/g, '_');
+    const opt = {
+      margin: [10, 12, 10, 12],
+      filename: `${fileBase.replace(/\.[^.]+$/, '')}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().from(contentRef.current).set(opt).save();
+  };
+
+  return (
+    <div className="message agent">
+      <button type="button" className="download-button" onClick={handleDownload} aria-label="PDF indir">
+        <img src={downloadIcon} alt="İndir" className="download-icon" />
+      </button>
+      <div className="doc-content" ref={contentRef}>
+        <div className="doc-title">{filename}</div>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+      </div>
     </div>
   );
 };
@@ -276,7 +313,7 @@ function App() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
-
+  
   // State yönetimi
   const [planEditorState, setPlanEditorState] = useState('hidden'); // 'hidden', 'editing', 'approved'
   const [pendingPlan, setPendingPlan] = useState(null);
@@ -284,6 +321,9 @@ function App() {
   
   const [currentStage, setCurrentStage] = useState({ stage: 'init', progress: 0, message: 'Hazırlanıyor...' });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const showWelcome = messages.length === 0 && planEditorState === 'hidden' && !isLoading;
+  const welcomeInputRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -383,11 +423,19 @@ function App() {
         setCurrentStage({ stage: 'analyze', progress: 80, message: 'Analiz tamamlanıyor...' });
         
         setTimeout(() => {
-          const agentMessage = { text: data.result, sender: 'agent', isComplete: true };
-          setMessages(prev => [...prev, agentMessage]);
+          const docs = Array.isArray(data?.documents) ? data.documents : [];
+          if (docs.length > 0) {
+            setMessages(prev => [
+              ...prev,
+              ...docs.map(d => ({ sender: 'agent', isComplete: true, isDocument: true, filename: d.filename, text: d.content }))
+            ]);
+          } else {
+            const agentMessage = { text: data.result, sender: 'agent', isComplete: true };
+            setMessages(prev => [...prev, agentMessage]);
+          }
           setCurrentStage({ stage: 'completed', progress: 100, message: 'İş analizi başarıyla tamamlandı!' });
           setIsLoading(false);
-        }, 2000);
+        }, 1000);
       } else {
         throw new Error(data.error || 'Plan çalıştırma sırasında hata oluştu');
       }
@@ -421,7 +469,17 @@ function App() {
   return (
     <div className="app-container">
       <div className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
-         {/* Sidebar içeriği */}
+         <div className="sidebar-header">
+           <h3>Proje Aşamaları</h3>
+         </div>
+         <div className="sidebar-content">
+          <ul className="stages-flow">
+            <li className="stage-item active" aria-current="step">İhtiyaç Analizi</li>
+            <li className="stage-item passive" aria-disabled="true">Kod Gelişimi</li>
+            <li className="stage-item passive" aria-disabled="true">Test</li>
+            <li className="stage-item passive" aria-disabled="true">Deployment</li>
+          </ul>
+        </div>
       </div>
 
       {/* Sidebar açıkken görünen arkaplan - tıklanınca kapatır */}
@@ -433,80 +491,136 @@ function App() {
       <div className="chat-container">
         <div className="header">
           <div className="header-left">
-            <button className="hamburger-button" onClick={toggleSidebar}>
+            <button className="hamburger-button" onClick={toggleSidebar} aria-expanded={isSidebarOpen} aria-label="Menüyü aç/kapat">
               <div className="hamburger-icon"><span></span><span></span><span></span></div>
             </button>
-            <div className="header-title">İhtiyaç Analizi Asistanı</div>
           </div>
-          <div className="header-right"></div>
+          <div className="header-right">
+            <img src={fbLogo} alt="FibaBanka" className="header-logo" />
+          </div>
         </div>
 
         <div className="main-container">
-          <div className="messages">
-            {messages.map((msg, index) => {
-              // Son kullanıcı mesajını bul
-              const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
-              const isLastUserMessage = msg.sender === 'user' && index === lastUserMessageIndex;
-              
-              return (
-                <div key={index}>
-                  <div className={`message ${msg.sender}`} style={msg.sender === 'user' ? { maxWidth: computeUserMessageMaxWidth(msg.text) } : undefined}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
-                  </div>
-                  
-                  {/* Son kullanıcı mesajından sonra onaylanan planı göster */}
-                  {isLastUserMessage && planEditorState === 'approved' && (
-                    <PlanEditor
-                      plan={approvedPlan}
-                      onConfirm={() => {}}
-                      onCancel={() => {}}
-                      isReadonly={true}
-                    />
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Plan Editor - sadece editing modda gösteriliyor */}
-            {planEditorState === 'editing' && (
-              <PlanEditor
-                plan={pendingPlan}
-                onConfirm={handlePlanConfirmation}
-                onCancel={handlePlanCancel}
-                isReadonly={false}
-              />
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="input-area">
-            {isLoading && (
-              <ProgressIndicator 
-                stage={currentStage.stage}
-                progress={currentStage.progress}
-                message={currentStage.message}
-              />
-            )}
-            <div className="input-row">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                placeholder="kullanıcı input chat box"
-                disabled={isLoading || planEditorState === 'editing'}
-              />
-              <button 
-                onClick={sendMessage} 
-                disabled={isLoading || planEditorState === 'editing'}
-                className="send-button"
-                aria-label="Gönder"
-              >
-                <img src={sendIcon} alt="Send" className="send-icon" />
-              </button>
+          {showWelcome ? (
+            <div className="welcome-container">
+              <img src={fbLogo} alt="FibaBanka" className="welcome-logo" />
+              <h1 className="welcome-title">İhtiyaç Analizi Asistanı'na Hoş Geldiniz!</h1>
+              <p className="welcome-description">
+                    Proje fikrinizin ana hatlarını paylaşın; pazar potansiyelini, hedef kitleyi ve temel gereksinimleri sizin için analiz edip özetleyeyim.
+              </p>
+              <div className="suggestion-buttons">
+                <button
+                  type="button"
+                  className="suggestion-button"
+                  onClick={() => { setInput("KOBİ'ler için QR kod ile ödeme altyapısı"); welcomeInputRef.current?.focus(); }}
+                >
+                  KOBİ'ler için QR kod ile ödeme altyapısı
+                </button>
+                <button
+                  type="button"
+                  className="suggestion-button"
+                  onClick={() => { setInput('Mobil uygulama kullanıcılarımızın daha aktif olması için kampanya önerileri'); welcomeInputRef.current?.focus(); }}
+                >
+                  Mobil uygulama kullanıcılarımızın daha aktif olması için kampanya önerileri
+                </button>
+              </div>
+              <div className="input-row">
+                <input
+                  ref={welcomeInputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  placeholder="Buraya proje bilgilerinizi giriniz."
+                  disabled={isLoading || planEditorState === 'editing'}
+                />
+                <button 
+                  onClick={sendMessage} 
+                  disabled={isLoading || planEditorState === 'editing'}
+                  className="send-button"
+                  aria-label="Gönder"
+                >
+                  <img src={sendIcon} alt="Send" className="send-icon" />
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="messages">
+                {messages.map((msg, index) => {
+                  const lastUserMessageIndex = messages.map(m => m.sender).lastIndexOf('user');
+                  const isLastUserMessage = msg.sender === 'user' && index === lastUserMessageIndex;
+                  if (msg.isDocument) {
+                    return (
+                      <React.Fragment key={index}>
+                        <DocumentBubble filename={msg.filename} content={msg.text} />
+                        {isLastUserMessage && planEditorState === 'approved' && (
+                          <PlanEditor
+                            plan={approvedPlan}
+                            onConfirm={() => {}}
+                            onCancel={() => {}}
+                            isReadonly={true}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  }
+                  return (
+                    <React.Fragment key={index}>
+                      <div className={`message ${msg.sender}`}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                      </div>
+                      {isLastUserMessage && planEditorState === 'approved' && (
+                        <PlanEditor
+                          plan={approvedPlan}
+                          onConfirm={() => {}}
+                          onCancel={() => {}}
+                          isReadonly={true}
+                        />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+                {planEditorState === 'editing' && (
+                  <PlanEditor
+                    plan={pendingPlan}
+                    onConfirm={handlePlanConfirmation}
+                    onCancel={handlePlanCancel}
+                    isReadonly={false}
+                  />
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="input-area">
+                <div className="input-row">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                    placeholder="Buraya proje bilgilerinizi giriniz."
+                    disabled={isLoading || planEditorState === 'editing'}
+                  />
+                  <button 
+                    onClick={sendMessage} 
+                    disabled={isLoading || planEditorState === 'editing'}
+                    className="send-button"
+                    aria-label="Gönder"
+                  >
+                    <img src={sendIcon} alt="Send" className="send-icon" />
+                  </button>
+                </div>
+                {isLoading && (
+                  <ProgressIndicator 
+                    stage={currentStage.stage}
+                    progress={currentStage.progress}
+                    message={currentStage.message}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -30,8 +30,8 @@ body {
 .app-container {
   position: relative;
   width: 100vw;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
+  overflow: visible;
   display: flex; /* Sidebar ve chat container'ı yan yana getirmek için */
 }
 
@@ -42,6 +42,7 @@ body {
   cursor: pointer;
   padding: 10px;
   border-radius: 8px;
+  margin-left: -10px;
 }
 
 .hamburger-icon {
@@ -56,7 +57,7 @@ body {
   display: block;
   height: 2px;
   width: 100%;
-  background-color: #f5f5f7; /* Beyaz ikon çizgileri */
+  background-color: #A0AEC0; /* Soluk gri, diğer UI soluk grilerle uyumlu */
   border-radius: 1px;
   transition: all 0.3s ease-in-out;
 }
@@ -128,15 +129,114 @@ body {
   color: var(--text-primary);
 }
 
+/* Aşama öğeleri için durum stilleri */
+.sidebar-content li.stage-item.active {
+  background-color: #EBF8FF;
+  border: 1px solid #BEE3F8;
+  color: #2B6CB0;
+  font-weight: 600;
+}
+
+.sidebar-content li.stage-item.passive {
+  color: #A0AEC0;
+  cursor: default;
+}
+
+.sidebar-content li.stage-item.passive:hover {
+  background-color: transparent;
+}
+
 .sidebar-content li:hover {
   background-color: #F3F4F6;
+}
+
+/* Proje Aşamaları - Ağaç/Tek Hat Akış Tasarımı */
+.stages-flow {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 8px 48px; /* sol boşluk: dikey hat + dallar için */
+  position: relative;
+  z-index: 0; /* ana hat için taban katman */
+}
+
+.stages-flow::before {
+  content: "";
+  position: absolute;
+  left: 0px; /* dikey akış hattı - 15px sola kaydırıldı */
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--border);
+  z-index: 0; /* kutuların arkasında kalsın */
+  pointer-events: none;
+}
+
+/* Her aşama: yatay dal + kutu */
+.stages-flow .stage-item {
+  position: relative;
+  margin: 6px 0;
+  padding: 10px 12px 10px 16px; /* solda içerik ofseti: çizgi metnin altına girmesin */
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  z-index: 1; /* dikey hattın üzerinde */
+  background-clip: padding-box; /* kenar birleşiminde çizgi sızıntısını engelle */
+}
+
+/* Yatay dal (dikey hattan aşamaya bağlanan çizgi) */
+.stages-flow .stage-item::before {
+  content: "";
+  position: absolute;
+  left: -39px; /* yeni dikey hat konumuna (9px) bağlanacak şekilde */
+  top: 50%;
+  width: 39px; /* dal uzunluğu güncellendi */
+  height: 2px;
+  background-color: #E5E7EB; /* varsayılan dal rengi */
+  transform: translateY(-50%);
+  z-index: 0; /* metin ve kutu üzerinde değil */
+  pointer-events: none;
+}
+
+/* Aktif aşama: arkaplan vurgusu ve koyu metin */
+.stages-flow .stage-item.active {
+  background-color: #EBF8FF; /* açık mavi/yeşil vurgusu */
+  border: 1px solid #BEE3F8;
+  color: #2B6CB0; /* okunabilir koyu mavi */
+  font-weight: 600;
+}
+
+/* Aktif aşamanın dalı: vurgu rengi */
+.stages-flow .stage-item.active::before {
+  background-color: var(--accent);
+}
+
+/* Aktif aşama için dikey hattın ilgili kısmını vurgulayan overlay */
+.stages-flow .stage-item.active::after {
+  content: "";
+  position: absolute;
+  left: -39px; /* yeni ana dikey hat ile hizalı */
+  top: 8px; /* içerik padding'i ile hizala */
+  bottom: 8px;
+  width: 2px;
+  background-color: var(--accent);
+  z-index: 0; /* kutunun arkasında kalsın */
+  pointer-events: none;
+}
+
+/* Pasif aşamalar: metin ve dal daha soluk */
+.stages-flow .stage-item.passive {
+  color: #A0AEC0; /* soluk gri */
+}
+
+.stages-flow .stage-item.passive::before {
+  background-color: currentColor; /* dal rengi yazı rengi ile uyumlu */
+  opacity: 0.6; /* daha sönük görünüm */
 }
 
 
 /* Chat Container */
 .chat-container {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-page);
@@ -157,6 +257,7 @@ body {
 
 .header-left { display: flex; align-items: center; gap: 12px; }
 .header-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+.header-logo { width: 95px; height: 25px; object-fit: contain; }
 
 .header p {
   margin: 0;
@@ -171,16 +272,17 @@ body {
 
 /* Mesajlar Alanı */
 .messages {
-  flex: 1;
-  padding: 24px 16px 24px 24px;
-  overflow-y: auto;
+  /* Page should scroll, not this container */
+  /* flex: 1; */
+  padding: 24px 0 80px 24px;
+  overflow-y: visible;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .message {
-  padding: 16px 20px;
+  padding: 12px 15px;
   border-radius: 16px;
   margin: 0;
   max-width: 75%;
@@ -217,9 +319,10 @@ body {
   background-color: var(--bg-card);
   color: var(--text-primary);
   align-self: flex-start;
-  margin-right: 25%;
+  margin-right: 0;
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
+  position: relative;
 }
 
 /* Gömülü Editör Stilleri */
@@ -309,28 +412,45 @@ body {
 
 /* Input Alanı */
 .input-area {
-  padding: 24px;
-  background-color: var(--bg-page);
-  border-top: 1px solid var(--border);
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  padding: 8px 24px 8px;
+  background-color: transparent;
+  border-top: none;
+  border-bottom: none;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 
 /* Input ve icon butonu aynı satırda */
 .input-area .input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative; /* send iconu input içinde konumlandırmak için */
 }
 
 .input-area input {
   width: 100%;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 16px;
+  border-radius: 25px;
+  font-size: 18px;
+  height: 56px;
   background-color: var(--bg-card);
   color: var(--text-primary);
   box-sizing: border-box;
+  padding-right: 56px; /* send iconu için boşluk (küçülen ikon) */
+  line-height: 24px; /* metnin dikey dengesi */
 }
 
 /* Satır içindeki input için override */
@@ -361,29 +481,35 @@ body {
   transition: background-color 0.2s;
 }
 
-/* Küçük gönder butonu */
+/* Küçük gönder butonu - input içinde, gri daire */
 .input-area .send-button {
-  width: 48px;
-  height: 48px;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background-color: var(--accent);
+  border-radius: 999px;
+  background-color: #F3F4F6; /* açık gri */
+  border: 1px solid #E5E7EB;
 }
 
-.send-button:hover:not(:disabled) { background-color: var(--accent-hover); }
+.send-button:hover:not(:disabled) { background-color: #D1D5DB; }
 
 .send-button:disabled {
-  background-color: #555;
-  color: #999;
+  background-color: #F3F4F6;
+  border-color: #E5E7EB;
   cursor: not-allowed;
 }
 
 .send-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  opacity: 0.9; /* hafif soluk görünüm */
 }
 
 .input-area button:hover:not(:disabled) {
@@ -391,9 +517,10 @@ body {
 }
 
 .input-area button:disabled {
-  background-color: #555;
+  background-color: #F3F4F6;
   color: #999;
   cursor: not-allowed;
+  border: 1px solid #E5E7EB;
 }
 
 /* Progress Indicator */
@@ -405,6 +532,68 @@ body {
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
 }
+
+/* New Circular Stepper */
+.stepper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0;
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+
+.stepper-item {
+  position: relative;
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* connector line to the next step */
+.stepper-item::after {
+  content: "";
+  position: absolute;
+  top: 14px; /* vertically centers with 28px circle */
+  left: calc(50% + 14px);
+  width: calc(100% - 28px);
+  height: 2px;
+  background-color: #E2E8F0;
+}
+
+.stepper-item:last-child::after { display: none; }
+
+.stepper-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid #E2E8F0;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+.stepper-label {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: normal;
+}
+
+/* states */
+.stepper-item.done .stepper-circle,
+.stepper-item.active .stepper-circle {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* fill connectors only for completed (left of active) */
+.stepper-item.done::after { background-color: var(--accent); }
+
+/* Remove old underline indicator under stage labels */
+.stage.active::after { content: none; }
 
 .progress-bar-container {
   width: 100%;
@@ -524,8 +713,8 @@ body {
 }
 
 .step-flow-container.readonly {
-  border-color: #2c2c2e;
-  background: rgba(15, 15, 15, 0.8);
+  border-color: var(--border);
+  background: var(--bg-card);
 }
 
 .step-flow-header {
@@ -611,7 +800,7 @@ body {
 
 .query-input, .analysis-input, .output-input {
   flex: 1;
-  padding: 10px 12px;
+  padding: 0px 12px;
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -631,9 +820,10 @@ body {
 }
 
 .query-input.readonly, .analysis-input.readonly {
-  background-color: #0f0f0f;
-  color: #8e8e93;
-  border-color: #2c2c2e;
+  background-color: #F9FAFB;
+  color: var(--text-primary);
+  border-color: var(--border);
+  opacity: 0.85;
   cursor: not-allowed;
 }
 
@@ -671,9 +861,10 @@ body {
 }
 
 .output-input.readonly {
-  background-color: #0f0f0f;
-  color: #8e8e93;
-  border-color: #2c2c2e;
+  background-color: #F9FAFB;
+  color: var(--text-primary);
+  border-color: var(--border);
+  opacity: 0.85;
   cursor: not-allowed;
 }
 
@@ -682,7 +873,7 @@ body {
 }
 
 /* Fixed Format Display */
-.fixed-format-display { padding: 12px 16px; background-color: #F7FAFC; border: 1px solid var(--border); border-radius: 10px; width: 100%; max-width: 100%; }
+.fixed-format-display { padding: 12px 16px; background-color: #F7FAFC; border: 1px solid var(--border); border-radius: 10px;  max-width: 100%; }
 .fixed-format-display span { color: var(--accent); font-size: 14px; font-weight: 500; font-family: inherit; }
 
 /* Step Flow Footer */
@@ -706,9 +897,118 @@ body {
   /* Allow the content area to expand and scroll properly */
   display: flex;
   flex-direction: column;
-  flex: 1;
-  overflow: hidden; /* prevent double scrollbars */
+  flex: none;
+  overflow: visible; /* prevent double scrollbars */
 }
+
+/* Welcome screen styles */
+.welcome-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+  padding: 48px 24px;
+  transform: translateY(10px);
+}
+
+.welcome-logo {
+  width: 120px;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+
+.welcome-title {
+  margin: 0;
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.welcome-description {
+  margin: 0;
+  margin-top: 8px;
+  font-size: 16px;
+  color: var(--text-secondary);
+  max-width: 760px;
+  line-height: 1.7;
+}
+
+.suggestion-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.suggestion-button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  background-color: #F3F4F6;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.suggestion-button:hover { background-color: #E5E7EB; border-color: #D1D5DB; }
+
+/* Input row reused in welcome */
+.welcome-container .input-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+  margin: 8px auto 0;
+  position: relative;
+}
+
+.welcome-container input {
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 25px;
+  font-size: 18px;
+  height: 56px;
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  padding-right: 56px; /* send iconu için boşluk */
+  line-height: 24px;
+}
+
+.welcome-container input::placeholder { color: var(--text-secondary); }
+
+.welcome-container input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.15);
+}
+
+.welcome-container .send-button {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+}
+
+.welcome-container .send-button:hover:not(:disabled) { background-color: #E9ECEF; }
+.welcome-container .send-button:disabled { background-color: #F3F4F6; border-color: #E5E7EB; cursor: not-allowed; }
 
 /* Hover micro-interactions for inputs */
 .query-input:hover, .analysis-input:hover, .output-input:hover, .input-area input:hover {
@@ -759,3 +1059,42 @@ body {
 /* Add button: ghost secondary */
 .add-btn { background-color: transparent; border: 1px solid #3B82F6; color: #3B82F6; }
 .add-btn:hover { background-color: rgba(59, 130, 246, 0.08); border-color: #3B82F6; color: #3B82F6; }
+
+/* Document bubble specific styles */
+.download-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: #EDF2F7;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.download-button:hover {
+  background-color: #E2E8F0;
+}
+
+.doc-title {
+  margin: 0 0 8px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.doc-content {
+  /* reserved for future tweaks */
+}
+
+.download-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
