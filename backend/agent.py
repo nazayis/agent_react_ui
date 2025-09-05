@@ -51,43 +51,39 @@ pending_runs = {}
 @tool
 def read_articles(urls: list[str]) -> str:
     """Fetch and combine readable text content from multiple URLs into a single string."""
-    combined_text = ""
-    for url in urls:
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def fetch(url: str, timeout: int = 6, max_chars: int = 3000) -> str:
         try:
-            response = requests.get(url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
+            response = requests.get(url, timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
             response.raise_for_status()
-                        
-            # Encoding'i düzgün handle et
+            
             if response.encoding is None:
                 response.encoding = getattr(response, "apparent_encoding", None) or 'utf-8'
-
-            # BeautifulSoup'a düzgün encoded text ver
+            
             try:
-                # Önce response.text kullanmayı dene (otomatik encoding)
                 soup = BeautifulSoup(response.text, 'html.parser')
             except UnicodeDecodeError:
                 enc = getattr(response, "apparent_encoding", None) or 'utf-8'
                 soup = BeautifulSoup(response.content.decode(enc, errors='replace'), 'html.parser')
-                
-            # Sadece ana içerik alanlarını al
-            # Scripttleri, style'ları ve navigation'ları kaldır
+
             for element in soup(['script', 'style', 'nav', 'header', 'footer', 'aside']):
                 element.decompose()
             
             text = soup.get_text(separator=' ', strip=True)
-            
-            # Fazla boşlukları temizle
             text = re.sub(r'\s+', ' ', text)
-            text = re.sub(r'\n\s*\n', '\n\n', text)
-            
-            # Sadece yazdırılabilir karakterleri tut
             text = ''.join(char for char in text if char.isprintable() or char in '\n\t')
             
-            combined_text += f"\n\n--- CONTENT FROM {url} ---\n\n{text[:5000]}"  # İlk 5000 karakter
-            
+            return f"\n\n--- CONTENT FROM {url} ---\n\n{text[:max_chars]}"
         except Exception as e:
-            combined_text += f"\n\n--- ERROR READING {url}: {str(e)} ---\n\n"
-    
+            return f"\n\n--- ERROR READING {url}: {str(e)} ---\n\n"
+
+    combined_text = ""
+    max_workers = min(8, max(1, len(urls)))
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(fetch, u): u for u in urls}
+        for fut in as_completed(futures):
+            combined_text += fut.result()
     return combined_text
 
 # ==============================================================================
@@ -107,7 +103,7 @@ def generate_plan_endpoint():
     async def _run():
         today = datetime.datetime.now().strftime("%Y-%m-%d")
         planning_agent = Agent(
-            model=OpenAIChat(id="gpt-5-nano"),
+            model=OpenAIChat(id="gpt-4o-mini"),
             tools=[],  # Planning agent doesn't need external tools
             instructions=[
                 f"Sen iş araştırması ve teklif oluşturma için Stratejik Planlama Ajanısın. Bugünün tarihi: {today}",
@@ -173,7 +169,7 @@ def execute_plan_endpoint():
                 if t and t not in seen:
                     seen.add(t)
                     queries.append(t)
-    queries = queries[:5]
+    queries = queries[:3]
 
     raw_focus = plan.get('analysis_focus', []) if isinstance(plan, dict) else []
     focuses = []
@@ -206,19 +202,19 @@ def execute_plan_endpoint():
     user_id = f"user_{session_id}"
 
     async def _run():
-        async with MCPTools(f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}", timeout_seconds=30) as fs_tools:
+        async with MCPTools(f"npx -y @modelcontextprotocol/server-filesystem {OUTPUT_DIR.resolve()}", timeout_seconds=10) as fs_tools:
             # 1. Araştırma ve Toplama Ajanı
             searcher = Agent(
                 name="Araştırmacı",
-                model=OpenAIChat(id="gpt-5-nano"),
+                model=OpenAIChat(id="gpt-4o-mini"),
                 tools=[GoogleSearchTools()],
                 knowledge=knowledge_base,
                 instructions=[
                     "Sen bir Araştırmacısın. Verilen arama sorgularını çalıştırıp URL'leri toplarsın.",
                     "FRAGMAN: Her sorgu için ÖNCE bilgi tabanında (KB) arama yap; ilgili bulguları kısa maddelerle özetle ve kaynak dosya adlarını belirt. Ardından Google araması yap.",
                     "Frontend'de onaylanan arama sorgularını esas alarak en etkin arama sorgularını oluştur",
-                    "Toplam arama sorgusu 5'i GEÇMEMELİ. 5'ten fazlaysa en alakalı 5'ini seç ve yalnızca onlar için sonuç topla.",
-                    "Her sorgu için en alakalı 3 URL bul ve listele.",
+                    "Toplam arama sorgusu 3'ü GEÇMEMELİ. Fazlaysa en alakalı 3'ünü seç ve yalnızca onlar için sonuç topla.",
+                    "Her sorgu için en alakalı 2 URL bul ve listele.",
                     "YASAK: Öneri yapma, izin isteme, yorum ekleme.",
                 ],
                 markdown=True,
@@ -232,7 +228,7 @@ def execute_plan_endpoint():
                 tools=[read_articles],
                 instructions=[
                     "Sen bir İçerik Okuyucusun. Verilen URL'lerdeki içerikleri okur ve özetlersin.",
-                    "Her URL'yi ayrı ayrı oku ve içeriği özetle.",
+                    "Her URL'yi ayrı ayrı oku ve en fazla 5 maddede, toplam 400-600 karakterlik sıkıştırılmış özet çıkar.",
                     "YASAK: Öneri sunma, izin isteme.",
                 ],
                 markdown=True,
@@ -242,7 +238,7 @@ def execute_plan_endpoint():
             # 3. Analiz Ajanı
             analyzer = Agent(
                 name="Analist",
-                model=OpenAIChat(id="gpt-5-nano"),
+                model=OpenAIChat(id="gpt-4o-mini"),
                 tools=[],
                 instructions=[
                     "Sen bir İş Analistisisin. Verilen içerikleri analiz eder ve bulgularını raporlarsın.",
@@ -265,7 +261,7 @@ def execute_plan_endpoint():
             ]
             proposer = Agent(
                 name="İş Planı Uzmanı",
-                model=OpenAIChat(id="gpt-5-nano"),
+                model=OpenAIChat(id="gpt-4o-mini"),
                 tools=[fs_tools],
                 instructions=proposer_instructions,
                 markdown=True,
@@ -299,7 +295,7 @@ def execute_plan_endpoint():
             analysis_team = Team(
                 name="İş Strateji Takımı",
                 mode="coordinate",
-                model=OpenAIChat(id="gpt-4o"),
+                model=OpenAIChat(id="gpt-4o-mini"),
                 members=[searcher, reader, analyzer, proposer],
                 tools=[fs_tools],
                 user_id=user_id,
@@ -308,9 +304,9 @@ def execute_plan_endpoint():
                     "Sen bir Proje Koordinatörüsün. Takımı yönetir ve verilen planı uygularsın."
                 ),
                 instructions=team_instructions,
-                add_datetime_to_instructions=True,
-                enable_agentic_context=True,
-                share_member_interactions=True,
+                add_datetime_to_instructions=False,
+                enable_agentic_context=False,
+                share_member_interactions=False,
                 markdown=True,
                 debug_mode=True,
                 knowledge=knowledge_base,
